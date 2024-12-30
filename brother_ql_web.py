@@ -50,9 +50,12 @@ def labeldesigner():
 
 def get_label_context(request):
     """ might raise LookupError() """
-
+    # print("Request: "+ str(request))
     d = request.params.decode() # UTF-8 decoded form data
-
+    # keys = d.keys()
+    # for key in keys:
+    #     print(key)
+    # print(d.get('font_family'))
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
     context = {
@@ -119,8 +122,8 @@ def create_label_im(text, **kwargs):
         if line == '': line = ' '
         lines.append(line)
     text = '\n'.join(lines)
-    linesize = im_font.getsize(text)
-    textsize = draw.multiline_textsize(text, font=im_font)
+    #linesize = im_font.getbbox(text)
+    textsize = draw.multiline_textbbox(xy=(1000,1000),text=text, font=im_font)
     width, height = kwargs['width'], kwargs['height']
     if kwargs['orientation'] == 'standard':
         if label_type in (ENDLESS_LABEL,):
