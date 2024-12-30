@@ -112,3 +112,9 @@ venv.bak/
 
 # pdf
 *.pdf
+
+# conda
+.conda/
+
+# Synology System Files
+.DS_Store
