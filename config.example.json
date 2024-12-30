@@ -1,13 +1,14 @@
 {
   "SERVER": {
     "PORT": 8013,
-    "HOST": "",
+    "HOST": "0.0.0.0",
     "LOGLEVEL": "WARNING",
     "ADDITIONAL_FONT_FOLDER": false
   },
   "PRINTER": {
-    "MODEL": "QL-500",
-    "PRINTER": "file:///dev/usb/lp1"
+    "MODEL": "Dymo 450",
+    "PRINTER": "file:///dev/usb/lp1",
+    "CUPS_PRINTER": "DYMO_LabelWriter_450_LabelWrite"
   },
   "LABEL": {
     "DEFAULT_SIZE": "62",
@@ -21,7 +22,7 @@
   },
   "WEBSITE": {
     "HTML_TITLE": "Label Designer",
-    "PAGE_TITLE": "Brother QL Label Designer",
-    "PAGE_HEADLINE": "Design your label and print it…"
+    "PAGE_TITLE": "Quax's Label Designer",
+    "PAGE_HEADLINE": "Design and print all your homelab Labels"
   }
 }
