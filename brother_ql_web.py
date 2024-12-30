@@ -7,9 +7,15 @@ This is a web service to print labels on Brother QL label printers.
 
 import sys, logging, random, json, argparse
 from io import BytesIO
+import os
 
 from bottle import run, route, get, post, response, request, jinja2_view as view, static_file, redirect
 from PIL import Image, ImageDraw, ImageFont
+
+from barcode import Code128
+from barcode.writer import ImageWriter
+from PyPDF2 import PdfReader, PdfWriter
+import cups
 
 from brother_ql.devicedependent import models, label_type_specs, label_sizes
 from brother_ql.devicedependent import ENDLESS_LABEL, DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL
@@ -29,6 +35,8 @@ except FileNotFoundError as e:
     with open('config.example.json', encoding='utf-8') as fh:
         CONFIG = json.load(fh)
 
+#> Default Values
+default_label_size = "57x32"
 
 @route('/')
 def index():
@@ -50,40 +58,23 @@ def labeldesigner():
 
 def get_label_context(request):
     """ might raise LookupError() """
-    # print("Request: "+ str(request))
     d = request.params.decode() # UTF-8 decoded form data
-    # keys = d.keys()
-    # for key in keys:
-    #     print(key)
-    # print(d.get('font_family'))
+
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
+    
     context = {
-      'text':          d.get('text', None),
-      'font_size': int(d.get('font_size', 100)),
-      'font_family':   font_family,
-      'font_style':    font_style,
-      'label_size':    d.get('label_size', "62"),
-      'kind':          label_type_specs[d.get('label_size', "62")]['kind'],
-      'margin':    int(d.get('margin', 10)),
-      'threshold': int(d.get('threshold', 70)),
-      'align':         d.get('align', 'center'),
-      'orientation':   d.get('orientation', 'standard'),
-      'margin_top':    float(d.get('margin_top',    24))/100.,
-      'margin_bottom': float(d.get('margin_bottom', 45))/100.,
-      'margin_left':   float(d.get('margin_left',   35))/100.,
-      'margin_right':  float(d.get('margin_right',  35))/100.,
       'grocycode': d.get('grocycode', None),
       'product': d.get('product', None),
-      'duedate': d.get('duedate', None)
+      'duedate': d.get('duedate', None),
+      'label_width': int(d.get('label_size', default_label_size).rpartition('x')[0].rstrip()),
+      'label_height': int(d.get('label_size', default_label_size).rpartition('x')[2].rstrip()),
+      'dpi': d.get('dpi',300),
+      'font_family':   font_family,
+      'font_style':    font_style
     }
-    context['margin_top']    = int(context['font_size']*context['margin_top'])
-    context['margin_bottom'] = int(context['font_size']*context['margin_bottom'])
-    context['margin_left']   = int(context['font_size']*context['margin_left'])
-    context['margin_right']  = int(context['font_size']*context['margin_right'])
-
-    context['fill_color']  = (255, 0, 0) if 'red' in context['label_size'] else (0, 0, 0)
-
+    
+    
     def get_font_path(font_family_name, font_style_name):
         try:
             if font_family_name is None or font_style_name is None:
@@ -95,18 +86,6 @@ def get_label_context(request):
         return font_path
 
     context['font_path'] = get_font_path(context['font_family'], context['font_style'])
-
-    def get_label_dimensions(label_size):
-        try:
-            ls = label_type_specs[context['label_size']]
-        except KeyError:
-            raise LookupError("Unknown label_size")
-        return ls['dots_printable']
-
-    width, height = get_label_dimensions(context['label_size'])
-    if height > width: width, height = height, width
-    if context['orientation'] == 'rotated': height, width = width, height
-    context['width'], context['height'] = width, height
 
     return context
 
@@ -151,62 +130,95 @@ def create_label_im(text, **kwargs):
     draw.multiline_text(offset, text, kwargs['fill_color'], font=im_font, align=kwargs['align'])
     return im
 
-def create_label_grocy(text, **kwargs):
-    product = kwargs['product']
-    duedate = kwargs['duedate']
-    grocycode = kwargs['grocycode']
+def create_label_grocy(kwargs):
+    """
+    Erstellt ein Label mit Text und einem Code-128 Barcode.
+    
+    :param text_lines: Liste mit Textzeilen (max. 2 Zeilen)
+    :param barcode_data: Daten für den Code-128 Barcode
+    :param label_size_mm: Maße des Labels in Millimetern (Breite, Höhe)
+    :param dpi: Druckauflösung (dots per inch)
+    :return: PIL-Image des Labels
+    """
+
+    text_lines = [kwargs['product'],kwargs['duedate']]
+    print(text_lines)
+    barcode_data = kwargs['grocycode']
+    label_size_mm = (kwargs['label_width'],kwargs['label_height'])
+    dpi = kwargs['dpi']
+    
+    # Berechnung der Pixel basierend auf DPI
+    label_size_px = (int(label_size_mm[0] / 25.4 * dpi), int(label_size_mm[1] / 25.4 * dpi))
+
+    # Erstelle das Label-Bild
+    label_image = Image.new("RGB", label_size_px, "white")
+    draw = ImageDraw.Draw(label_image)
+
+    desired_font_height_mm = 6
+    # Schriftart laden (Systemschrift oder Standardschrift)
+    try:
+        font_size = int(desired_font_height_mm / 25.4 * dpi)  # Schriftgröße: 8 mm (entspricht ~22.7 pt bei 300 DPI)
+        font = ImageFont.truetype(kwargs['font_path'], font_size)
+    except IOError:
+        font = ImageFont.load_default()
 
 
-    # prepare grocycode datamatrix
-    from pylibdmtx.pylibdmtx import encode
-    encoded = encode(grocycode.encode('utf8'), size="SquareAuto") # adjusted for 300x300 dpi - results in DM code roughly 5x5mm
-    datamatrix = Image.frombytes('RGB', (encoded.width, encoded.height), encoded.pixels)
-    datamatrix.save('/tmp/dmtx.png')
+    # Text hinzufügen (1. und 2. Zeile)
+    y_offset = int(1.5 / 25.4 * dpi)  # Oberer Rand: 3 mm
+    for line in text_lines[:2]:  # Maximal 2 Zeilen
+        text_width = draw.textlength(line, font=font)
+        text_height = font_size
+        x_offset = (label_size_px[0] - text_width) // 2  # Zentrierung
+        draw.text((x_offset, y_offset), line, fill="black", font=font)
+        y_offset += text_height + int(3 / 25.4 * dpi)  # Abstand zwischen den Zeilen
 
-    product_font = ImageFont.truetype(kwargs['font_path'], 100)
-    duedate_font = ImageFont.truetype(kwargs['font_path'], 60)
-    width = kwargs['width']
-    height = 200
-    if kwargs['orientation'] == 'rotated':
-        tw = width
-        width = height
-        height = tw
+    # Barcode hinzufügen
+    barcode_class = Code128(barcode_data, writer=ImageWriter())
+    barcode_options = {
+        "module_width": 0.3,  # Breite eines Moduls in mm
+        "module_height": 15,  # Höhe des Barcodes: 15 mm
+        "quiet_zone": 0,  # Abstand links und rechts
+        "font_size": 1,  # Keine Schrift unter dem Barcode
+        "text_distance": 0,  # Abstand zwischen Barcode und Text
+    }
+    barcode_img_buffer = BytesIO()
+    barcode_class.write(barcode_img_buffer, options=barcode_options)
+    barcode_img_buffer.seek(0)
 
-    im = Image.new('RGB', (width, height), 'white')
-    draw = ImageDraw.Draw(im)
-    if kwargs['orientation'] == 'standard':
-        vertical_offset = kwargs['margin_top']
-        horizontal_offset = kwargs['margin_left']
-    elif kwargs['orientation'] == 'rotated':
-        vertical_offset = kwargs['margin_top']
-        horizontal_offset = kwargs['margin_left']
-        datamatrix.transpose(Image.ROTATE_270)
+    # Barcode als Bild laden und skalieren
+    barcode_pil_img = Image.open(barcode_img_buffer)
+    barcode_width, barcode_height = barcode_pil_img.size
+    scale_factor = label_size_px[0] / barcode_width  # Breite anpassen
+    barcode_pil_img = barcode_pil_img.resize(
+        (label_size_px[0], barcode_height),#int(barcode_height * scale_factor)),
+        Image.LANCZOS,  # Verwende direkt LANCZOS für die Skalierung
+    )
 
-    im.paste(datamatrix, (horizontal_offset, vertical_offset, horizontal_offset + encoded.width, vertical_offset + encoded.height))
+    # Positioniere den Barcode unten auf dem Label
+    barcode_x = 0
+    barcode_y = label_size_px[1] - barcode_pil_img.size[1] + 15
+    label_image.paste(barcode_pil_img, (barcode_x, barcode_y))
 
-    if kwargs['orientation'] == 'standard':
-        vertical_offset += -10
-        horizontal_offset = encoded.width + 40
-    elif kwargs['orientation'] == 'rotated':
-        vertical_offset += encoded.width + 40
-        horizontal_offset += -10
+    return label_image
 
-    textoffset = horizontal_offset, vertical_offset
-
-    draw.text(textoffset, product, kwargs['fill_color'], font=product_font)
-
-    if duedate is not None:
-        if kwargs['orientation'] == 'standard':
-            vertical_offset += 110
-            horizontal_offset = kwargs['margin_left']
-        elif kwargs['orientation'] == 'rotated':
-            vertical_offset = kwargs['margin_left']
-            horizontal_offset += 110
-        textoffset = horizontal_offset, vertical_offset
-
-        draw.text(textoffset, duedate, kwargs['fill_color'], font=duedate_font)
-
-    return im
+def image_to_pdf(label_image, output_file="label", num_copies = 1):
+    """
+    Speichert das Label als PDF.
+    """
+    if num_copies > 1:
+        tmp_file = "/tmp/label_temp.pdf"
+        label_image.save(tmp_file, "PDF")
+        
+        output = PdfWriter()
+        label = PdfReader(open(tmp_file, "rb"))
+        for _ in range(num_copies):
+            output.add_page(label.pages[0])
+        outputStream = open(f"{output_file}.pdf", "wb")
+        output.write(outputStream)
+        outputStream.close()
+        os.remove(tmp_file)
+        
+    else: label_image.save(f"{output_file}.pdf", "PDF")
 
 @get('/api/preview/text')
 @post('/api/preview/text')
@@ -248,20 +260,19 @@ def print_grocy():
     if context['product'] is None:
         return_dict['error'] = 'Please provide the product for the label'
         return return_dict
-
-    im = create_label_grocy(**context)
-    if DEBUG: im.save('sample-out.png')
-
-    if context['kind'] == ENDLESS_LABEL:
-        rotate = 0 if context['orientation'] == 'standard' else 90
-    elif context['kind'] in (ROUND_DIE_CUT_LABEL, DIE_CUT_LABEL):
-        rotate = 'auto'
-
-    qlr = BrotherQLRaster(CONFIG['PRINTER']['MODEL'])
-    red = False
-    if 'red' in context['label_size']:
-        red = True
-    create_label(qlr, im, context['label_size'], red=red, threshold=context['threshold'], cut=True, rotate=rotate)
+    
+    if context['duedate'] is None:
+        context['duedate'] = ""
+    
+    print(context)
+    
+    #-- Add Code to create label and print it
+    im = create_label_grocy(context)
+    image_to_pdf(im, context['grocycode'])
+    cups_connection = cups.Connection()
+    #cups_connection.printFile(CONFIG['PRINTER']['CUPS_PRINTER'], f"{context['grocycode']}.pdf", "DYMO Label", {'choice': 'auto-fit'})
+    #-- Add Code to create label and print it
+    
 
     if not DEBUG:
         try:
@@ -337,9 +348,10 @@ def main():
     parser.add_argument('--port', default=False)
     parser.add_argument('--loglevel', type=lambda x: getattr(logging, x.upper()), default=False)
     parser.add_argument('--font-folder', default=False, help='folder for additional .ttf/.otf fonts')
-    parser.add_argument('--default-label-size', default=False, help='Label size inserted in your printer. Defaults to 62.')
+    parser.add_argument('--default-label-size', default=False, help='Label size inserted in your printer. Defaults to 57x32.')
     parser.add_argument('--default-orientation', default=False, choices=('standard', 'rotated'), help='Label orientation, defaults to "standard". To turn your text by 90°, state "rotated".')
     parser.add_argument('--model', default=False, choices=models, help='The model of your printer (default: QL-500)')
+    parser.add_argument('--cups', default=False, help='The CUPS name of your printer')
     parser.add_argument('printer',  nargs='?', default=False, help='String descriptor for the printer to use (like tcp://192.168.0.23:9100 or file:///dev/usb/lp0)')
     args = parser.parse_args()
 
@@ -363,6 +375,9 @@ def main():
 
     if args.model:
         CONFIG['PRINTER']['MODEL'] = args.model
+        
+    if args.cups:
+        CONFIG['PRINTER']['CUPS_PRINTER'] = args.cups
 
     if args.default_label_size:
         CONFIG['LABEL']['DEFAULT_SIZE'] = args.default_label_size
