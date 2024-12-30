@@ -35,7 +35,8 @@ def create_label(text_lines, barcode_data, label_size_mm=(57, 32), dpi=300):
     # Text hinzufügen (1. und 2. Zeile)
     y_offset = int(1.5 / 25.4 * dpi)  # Oberer Rand: 3 mm
     for line in text_lines[:2]:  # Maximal 2 Zeilen
-        text_width, text_height = draw.textsize(line, font=font)
+        text_width = draw.textlength(line, font=font)
+        text_height = font_size
         x_offset = (label_size_px[0] - text_width) // 2  # Zentrierung
         draw.text((x_offset, y_offset), line, fill="black", font=font)
         y_offset += text_height + int(3 / 25.4 * dpi)  # Abstand zwischen den Zeilen
@@ -46,7 +47,7 @@ def create_label(text_lines, barcode_data, label_size_mm=(57, 32), dpi=300):
         "module_width": 0.3,  # Breite eines Moduls in mm
         "module_height": int(15 / 25.4 * dpi)/20,  # Höhe des Barcodes: 15 mm
         "quiet_zone": 0,  # Abstand links und rechts
-        "font_size": 0,  # Keine Schrift unter dem Barcode
+        "font_size": 1,  # Keine Schrift unter dem Barcode
         "text_distance": 0,  # Abstand zwischen Barcode und Text
     }
     barcode_img_buffer = BytesIO()
@@ -109,7 +110,7 @@ def main():
     save_as_pdf(label_image, barcode_data, num_copies)
     print(f"Label gespeichert als {barcode_data}.pdf!")
     
-    print_label(printer_name, barcode_data)
+    #print_label(printer_name, barcode_data)
     print(f"Label {barcode_data}.pdf an Drucker gesendet!")
 
 
