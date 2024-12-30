@@ -8,14 +8,15 @@
   "PRINTER": {
     "MODEL": "Dymo 450",
     "PRINTER": "file:///dev/usb/lp1",
-    "CUPS_PRINTER": "DYMO_LabelWriter_450_LabelWrite"
+    "CUPS_PRINTER": "DYMO_LabelWriter_450_LabelWrite",
+    "DEFAULT_SIZE": "57x32"
   },
   "LABEL": {
     "DEFAULT_SIZE": "62",
     "DEFAULT_ORIENTATION": "standard",
     "DEFAULT_FONT_SIZE": 70,
     "DEFAULT_FONTS": [
-      {"family": "Minion Pro",      "style": "Semibold"},
+      {"family": "Bahnschrift",      "style": "Regular"},
       {"family": "Linux Libertine", "style": "Regular"},
       {"family": "DejaVu Serif",    "style": "Book"}
     ]
