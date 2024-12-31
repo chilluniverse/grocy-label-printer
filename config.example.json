@@ -6,9 +6,7 @@
     "ADDITIONAL_FONT_FOLDER": false
   },
   "PRINTER": {
-    "MODEL": "Dymo 450",
-    "PRINTER": "file:///dev/usb/lp1",
-    "CUPS_PRINTER": "DYMO_LabelWriter_450_LabelWrite",
+    "PRINTER": "DYMO_LabelWriter_450_LabelWrite",
     "DEFAULT_SIZE": "57x32"
   },
   "LABEL": {
