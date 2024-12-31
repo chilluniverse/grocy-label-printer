@@ -78,11 +78,19 @@
               <div class="chooser panel-body">
               <label for="marginTop">Margin Top:</label>
               <div class="input-group marginsTopBottom">
-                <input id="marginTop" class="form-control" type="number" min="0" max="200" value="24" onChange="preview()" required>    <span class="input-group-addon">%</span>
+                <input id="marginTop" class="form-control" type="number" min="0" max="200" value="0" onChange="preview()" required>    <span class="input-group-addon">%</span>
               </div>
               <label for="marginBottom">Margin Bottom:</label>
               <div class="input-group marginsTopBottom">
-                <input id="marginBottom" class="form-control" type="number" min="0" max="200" value="45" onChange="preview()" required> <span class="input-group-addon">%</span>
+                <input id="marginBottom" class="form-control" type="number" min="0" max="200" value="0" onChange="preview()" required> <span class="input-group-addon">%</span>
+              </div>
+              <label for="marginLeft">Margin Left:</label>
+              <div class="input-group marginsLeftRight">
+                <input id="marginLeft" class="form-control" type="number" min="0" max="200" value="0" onChange="preview()" required>   <span class="input-group-addon">%</span>
+              </div>
+              <label for="marginRight">Margin Right:</label>
+              <div class="input-group marginsLeftRight">
+                <input id="marginRight" class="form-control" type="number" min="0" max="200" value="0" onChange="preview()" required>  <span class="input-group-addon">%</span>
               </div>
               </div> <!-- class="chooser panel-body" -->
             </div>
@@ -132,11 +140,14 @@ function formData() {
     align:       $('input[name=fontAlign]:checked').val(),
     margin_top:    $('#marginTop').val(),
     margin_bottom: $('#marginBottom').val(),
+    margin_left:   $('#marginLeft').val(),
+    margin_right:  $('#marginRight').val()
   }
 }
 
 function preview() {
   $('.marginsTopBottom').prop('disabled', false).removeAttr('title');
+  $('.marginsLeftRight').prop('disabled', true).prop('title',  'Only relevant if rotated orientation is selected.');
   $.ajax({
     type:        'POST',
     url:         '/api/preview/text?return_format=base64',
