@@ -110,8 +110,9 @@ venv.bak/
 # idea
 .idea/*
 
-# pdf
+# pdf/png
 *.pdf
+*.png
 
 # conda
 .conda/
