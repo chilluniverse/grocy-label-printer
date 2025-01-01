@@ -30,9 +30,6 @@ except FileNotFoundError as e:
     with open('config.example.json', encoding='utf-8') as fh:
         CONFIG = json.load(fh)
 
-#> Default Values
-default_label_size = "57x32"
-
 @route('/')
 def index():
     redirect('/labeldesigner')
@@ -63,8 +60,8 @@ def get_label_context(request):
       'grocycode':    d.get('grocycode', None),
       'product':      d.get('product', None),
       'duedate':      d.get('duedate', None),
-      'width':  int(d.get('label_size', default_label_size).rpartition('x')[0].rstrip()),
-      'height': int(d.get('label_size', default_label_size).rpartition('x')[2].rstrip()),
+      'width':  int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[0].rstrip()),
+      'height': int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[2].rstrip()),
       'dpi':          d.get('dpi',300),
       'font_family':  font_family,
       'font_style':   font_style,
