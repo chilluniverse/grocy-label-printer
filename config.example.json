@@ -6,11 +6,10 @@
     "ADDITIONAL_FONT_FOLDER": false
   },
   "PRINTER": {
-    "PRINTER": "DYMO_LabelWriter_450_LabelWrite",
-    "DEFAULT_SIZE": "57x32"
+    "PRINTER": "Printer_Name_Here",
   },
   "LABEL": {
-    "DEFAULT_SIZE": "62",
+    "DEFAULT_SIZE": "57x32",
     "DEFAULT_ORIENTATION": "standard",
     "DEFAULT_FONT_SIZE": 70,
     "DEFAULT_FONTS": [
