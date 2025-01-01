@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-This is a web service to print labels on Brother QL label printers.
+This is a web service to print labels on Dymo 450 label printers.
 """
 
 import sys, logging, random, json, argparse
@@ -59,21 +59,22 @@ def get_label_context(request):
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
     
     context = {
-      'text':         d.get('text', None),
-      'grocycode':    d.get('grocycode', None),
-      'product':      d.get('product', None),
-      'duedate':      d.get('duedate', None),
-      'width':  int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[0].rstrip()),
-      'height': int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[2].rstrip()),
-      'dpi':          d.get('dpi',300),
-      'font_family':  font_family,
-      'font_style':   font_style,
-      'font_size':    int(d.get('font_size', 70)),
-      'margin_top':    float(d.get('margin_top',    0)),
-      'margin_bottom': float(d.get('margin_bottom', 0)),
-      'margin_left':   float(d.get('margin_left',   0)),
-      'margin_right':  float(d.get('margin_right',  0)),
-      'align':         d.get('align', 'center')
+      'text':           d.get('text', None),
+      'grocycode':      d.get('grocycode', None),
+      'product':        d.get('product', None),
+      'duedate':        d.get('duedate', None),
+      'width':          int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[0].rstrip()),
+      'height':         int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[2].rstrip()),
+      'dpi':            d.get('dpi',300),
+      'font_family':    font_family,
+      'font_style':     font_style,
+      'font_size':      int(d.get('font_size', 70)),
+      'margin_top':     float(d.get('margin_top',    0)),
+      'margin_bottom':  float(d.get('margin_bottom', 0)),
+      'margin_left':    float(d.get('margin_left',   0)),
+      'margin_right':   float(d.get('margin_right',  0)),
+      'line_spacing':   float(d.get('line_spacing', 0)),
+      'align':          d.get('align', 'center')
     }
     
     context['fill_color'] = (0, 0, 0)
@@ -135,7 +136,7 @@ def draw_multiline_text(img, text, font, kwargs, offset):
             raise ValueError("Invalid align value. Choose from 'left', 'center', or 'right'.")
 
         draw.text((x,y), t, font=font, fill=kwargs['fill_color'])
-        y += h
+        y += h + int(kwargs['line_spacing'] / 25.4 * 300)  # Abstand zwischen den Zeilen
 
     return img
 
@@ -163,9 +164,7 @@ def create_label_im(text, **kwargs):
     offset = horizontal_offset, vertical_offset
     
     draw_multiline_text(im, text, im_font, kwargs, offset)
-    # im.show()
-    
-    #draw.multiline_text(offset, text, kwargs['fill_color'], font=im_font, align=kwargs['align'])
+
     return im
 
 def create_label_grocy(kwargs):
@@ -401,15 +400,6 @@ def main():
 
 
     logging.basicConfig(level=LOGLEVEL)
-
-    # try:
-    #     selected_backend = guess_backend(CONFIG['PRINTER']['PRINTER'])
-    # except ValueError:
-    #     parser.error("Couln't guess the backend to use from the printer string descriptor")
-    # BACKEND_CLASS = backend_factory(selected_backend)['backend_class']
-
-    # if CONFIG['LABEL']['DEFAULT_SIZE'] not in label_sizes:
-    #     parser.error("Invalid --default-label-size. Please choose on of the following:\n:" + " ".join(label_sizes))
 
     FONTS = get_fonts()
     if ADDITIONAL_FONT_FOLDER:
