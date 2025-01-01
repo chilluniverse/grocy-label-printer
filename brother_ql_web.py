@@ -17,16 +17,11 @@ from barcode.writer import ImageWriter
 from PyPDF2 import PdfReader, PdfWriter
 import cups
 
-from brother_ql.devicedependent import models, label_type_specs, label_sizes
-from brother_ql.devicedependent import ENDLESS_LABEL, DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL
-from brother_ql import BrotherQLRaster, create_label
-from brother_ql.backends import backend_factory, guess_backend
-
 from font_helpers import get_fonts
 
 logger = logging.getLogger(__name__)
 
-LABEL_SIZES = [ (name, label_type_specs[name]['name']) for name in label_sizes]
+LABEL_SIZES = [('57x32', '57mm x 32mm')]
 
 try:
     with open('config.json', encoding='utf-8') as fh:
@@ -64,16 +59,24 @@ def get_label_context(request):
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
     
     context = {
-      'grocycode': d.get('grocycode', None),
-      'product': d.get('product', None),
-      'duedate': d.get('duedate', None),
-      'label_width': int(d.get('label_size', default_label_size).rpartition('x')[0].rstrip()),
-      'label_height': int(d.get('label_size', default_label_size).rpartition('x')[2].rstrip()),
-      'dpi': d.get('dpi',300),
-      'font_family':   font_family,
-      'font_style':    font_style
+      'text':         d.get('text', None),
+      'grocycode':    d.get('grocycode', None),
+      'product':      d.get('product', None),
+      'duedate':      d.get('duedate', None),
+      'width':  int(d.get('label_size', default_label_size).rpartition('x')[0].rstrip()),
+      'height': int(d.get('label_size', default_label_size).rpartition('x')[2].rstrip()),
+      'dpi':          d.get('dpi',300),
+      'font_family':  font_family,
+      'font_style':   font_style,
+      'font_size':    int(d.get('font_size', 100)),
+      'margin_top':    float(d.get('margin_top',    0)),
+      'margin_bottom': float(d.get('margin_bottom', 0)),
+      'margin_left':   float(d.get('margin_left',   0)),
+      'margin_right':  float(d.get('margin_right',  0)),
+      'align':         d.get('align', 'center')
     }
     
+    context['fill_color'] = (0, 0, 0)
     
     def get_font_path(font_family_name, font_style_name):
         try:
@@ -90,7 +93,6 @@ def get_label_context(request):
     return context
 
 def create_label_im(text, **kwargs):
-    label_type = kwargs['kind']
     im_font = ImageFont.truetype(kwargs['font_path'], kwargs['font_size'])
     im = Image.new('L', (20, 20), 'white')
     draw = ImageDraw.Draw(im)
@@ -102,30 +104,15 @@ def create_label_im(text, **kwargs):
         lines.append(line)
     text = '\n'.join(lines)
     #linesize = im_font.getbbox(text)
-    textsize = draw.multiline_textbbox(xy=(1000,1000),text=text, font=im_font)
+    textsize = draw.multiline_textbbox(xy=(0,0),text=text, font=im_font)
     width, height = kwargs['width'], kwargs['height']
-    if kwargs['orientation'] == 'standard':
-        if label_type in (ENDLESS_LABEL,):
-            height = textsize[1] + kwargs['margin_top'] + kwargs['margin_bottom']
-    elif kwargs['orientation'] == 'rotated':
-        if label_type in (ENDLESS_LABEL,):
-            width = textsize[0] + kwargs['margin_left'] + kwargs['margin_right']
-    im = Image.new('RGB', (width, height), 'white')
+    im = Image.new('RGB', (width*10, height*10), 'white')
     draw = ImageDraw.Draw(im)
-    if kwargs['orientation'] == 'standard':
-        if label_type in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
-            vertical_offset  = (height - textsize[1])//2
-            vertical_offset += (kwargs['margin_top'] - kwargs['margin_bottom'])//2
-        else:
-            vertical_offset = kwargs['margin_top']
-        horizontal_offset = max((width - textsize[0])//2, 0)
-    elif kwargs['orientation'] == 'rotated':
-        vertical_offset  = (height - textsize[1])//2
-        vertical_offset += (kwargs['margin_top'] - kwargs['margin_bottom'])//2
-        if label_type in (DIE_CUT_LABEL, ROUND_DIE_CUT_LABEL):
-            horizontal_offset = max((width - textsize[0])//2, 0)
-        else:
-            horizontal_offset = kwargs['margin_left']
+    
+    vertical_offset  = (height - textsize[1])//2
+    vertical_offset += (kwargs['margin_top'] - kwargs['margin_bottom'])//2
+    horizontal_offset = max((width - textsize[2])//2, 0)
+    horizontal_offset = kwargs['margin_left'] - kwargs['margin_right']
     offset = horizontal_offset, vertical_offset
     draw.multiline_text(offset, text, kwargs['fill_color'], font=im_font, align=kwargs['align'])
     return im
@@ -144,7 +131,7 @@ def create_label_grocy(kwargs):
     text_lines = [kwargs['product'],kwargs['duedate']]
     print(text_lines)
     barcode_data = kwargs['grocycode']
-    label_size_mm = (kwargs['label_width'],kwargs['label_height'])
+    label_size_mm = (kwargs['width'],kwargs['height'])
     dpi = kwargs['dpi']
     
     # Berechnung der Pixel basierend auf DPI
@@ -264,29 +251,23 @@ def print_grocy():
     if context['duedate'] is None:
         context['duedate'] = ""
     
-    print(context)
+    if DEBUG: print(context)
     
-    #-- Add Code to create label and print it
     im = create_label_grocy(context)
-    image_to_pdf(im, context['grocycode'])
-    cups_connection = cups.Connection()
-    #cups_connection.printFile(CONFIG['PRINTER']['CUPS_PRINTER'], f"{context['grocycode']}.pdf", "DYMO Label", {'choice': 'auto-fit'})
-    #-- Add Code to create label and print it
-    
+    image_to_pdf(im, context['grocycode'])    
 
     if not DEBUG:
         try:
-            be = BACKEND_CLASS(CONFIG['PRINTER']['PRINTER'])
-            be.write(qlr.data)
-            be.dispose()
-            del be
+            cups_connection = cups.Connection()
+            cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], f"{context['grocycode']}.pdf", "DYMO Label", {'choice': 'auto-fit'})
+            del cups_connection
         except Exception as e:
             return_dict['message'] = str(e)
             logger.warning('Exception happened: %s', e)
             return return_dict
 
     return_dict['success'] = True
-    if DEBUG: return_dict['data'] = str(qlr.data)
+    if DEBUG: return_dict['data'] = f"{context['grocycode']}.pdf"
     return return_dict
 
 @post('/api/print/text')
@@ -308,38 +289,24 @@ def print_text():
     except LookupError as e:
         return_dict['error'] = e.msg
         return return_dict
-
     if context['text'] is None:
         return_dict['error'] = 'Please provide the text for the label'
         return return_dict
 
     im = create_label_im(**context)
     if DEBUG: im.save('sample-out.png')
-
-    if context['kind'] == ENDLESS_LABEL:
-        rotate = 0 if context['orientation'] == 'standard' else 90
-    elif context['kind'] in (ROUND_DIE_CUT_LABEL, DIE_CUT_LABEL):
-        rotate = 'auto'
-
-    qlr = BrotherQLRaster(CONFIG['PRINTER']['MODEL'])
-    red = False
-    if 'red' in context['label_size']:
-        red = True
-    create_label(qlr, im, context['label_size'], red=red, threshold=context['threshold'], cut=True, rotate=rotate)
-
+    
     if not DEBUG:
         try:
-            be = BACKEND_CLASS(CONFIG['PRINTER']['PRINTER'])
-            be.write(qlr.data)
-            be.dispose()
-            del be
+            cups_connection = cups.Connection()
+            cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], im, "DYMO Label", {'choice': 'auto-fit'})
+            del cups_connection
         except Exception as e:
             return_dict['message'] = str(e)
             logger.warning('Exception happened: %s', e)
             return return_dict
 
     return_dict['success'] = True
-    if DEBUG: return_dict['data'] = str(qlr.data)
     return return_dict
 
 def main():
@@ -350,8 +317,6 @@ def main():
     parser.add_argument('--font-folder', default=False, help='folder for additional .ttf/.otf fonts')
     parser.add_argument('--default-label-size', default=False, help='Label size inserted in your printer. Defaults to 57x32.')
     parser.add_argument('--default-orientation', default=False, choices=('standard', 'rotated'), help='Label orientation, defaults to "standard". To turn your text by 90°, state "rotated".')
-    parser.add_argument('--model', default=False, choices=models, help='The model of your printer (default: QL-500)')
-    parser.add_argument('--cups', default=False, help='The CUPS name of your printer')
     parser.add_argument('printer',  nargs='?', default=False, help='String descriptor for the printer to use (like tcp://192.168.0.23:9100 or file:///dev/usb/lp0)')
     args = parser.parse_args()
 
@@ -367,17 +332,11 @@ def main():
         LOGLEVEL = args.loglevel
     else:
         LOGLEVEL = CONFIG['SERVER']['LOGLEVEL']
-
+    
     if LOGLEVEL == 'DEBUG':
         DEBUG = True
     else:
         DEBUG = False
-
-    if args.model:
-        CONFIG['PRINTER']['MODEL'] = args.model
-        
-    if args.cups:
-        CONFIG['PRINTER']['CUPS_PRINTER'] = args.cups
 
     if args.default_label_size:
         CONFIG['LABEL']['DEFAULT_SIZE'] = args.default_label_size
@@ -393,14 +352,14 @@ def main():
 
     logging.basicConfig(level=LOGLEVEL)
 
-    try:
-        selected_backend = guess_backend(CONFIG['PRINTER']['PRINTER'])
-    except ValueError:
-        parser.error("Couln't guess the backend to use from the printer string descriptor")
-    BACKEND_CLASS = backend_factory(selected_backend)['backend_class']
+    # try:
+    #     selected_backend = guess_backend(CONFIG['PRINTER']['PRINTER'])
+    # except ValueError:
+    #     parser.error("Couln't guess the backend to use from the printer string descriptor")
+    # BACKEND_CLASS = backend_factory(selected_backend)['backend_class']
 
-    if CONFIG['LABEL']['DEFAULT_SIZE'] not in label_sizes:
-        parser.error("Invalid --default-label-size. Please choose on of the following:\n:" + " ".join(label_sizes))
+    # if CONFIG['LABEL']['DEFAULT_SIZE'] not in label_sizes:
+    #     parser.error("Invalid --default-label-size. Please choose on of the following:\n:" + " ".join(label_sizes))
 
     FONTS = get_fonts()
     if ADDITIONAL_FONT_FOLDER:
