@@ -21,7 +21,10 @@ from font_helpers import get_fonts
 
 logger = logging.getLogger(__name__)
 
-LABEL_SIZES = [('57x32', '57mm x 32mm')]
+LABEL_SIZES = [
+    ('57x32', '57mm x 32mm'),
+    ('50x23', '50mm x 23mm')
+    ]
 
 try:
     with open('config.json', encoding='utf-8') as fh:
@@ -65,7 +68,7 @@ def get_label_context(request):
       'dpi':          d.get('dpi',300),
       'font_family':  font_family,
       'font_style':   font_style,
-      'font_size':    int(d.get('font_size', 100)),
+      'font_size':    int(d.get('font_size', 70)),
       'margin_top':    float(d.get('margin_top',    0)),
       'margin_bottom': float(d.get('margin_bottom', 0)),
       'margin_left':   float(d.get('margin_left',   0)),
@@ -89,18 +92,65 @@ def get_label_context(request):
 
     return context
 
+def draw_multiline_text(img, text, font, kwargs, offset):
+    width = img.size[0] - offset[1]  # Adjust for padding if needed
+    draw = ImageDraw.Draw(img)
+    
+    def break_fix(text, width, font, draw):
+        if not text:
+            return
+        lo = 0
+        hi = len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            t = text[:mid]
+            x, y, w, h = draw.textbbox((0, 0), text=t, font=font)
+            if w <= width:
+                lo = mid
+            else:
+                hi = mid - 1
+        t = text[:lo]
+        x, y, w, h = draw.textbbox((0, 0), text=t, font=font)
+        yield t, w, h
+        yield from break_fix(text[lo:], width, font, draw)
+        
+    pieces = list(break_fix(text, width, font, draw))
+    height = sum(p[2] for p in pieces)
+
+    if height > img.size[1]:
+        raise ValueError("text doesn't fit")
+
+    # Start drawing from the top-left corner
+    y = kwargs['margin_top']  # Top margin can be adjusted if needed
+
+    align = kwargs['align']
+    for t, w, h in pieces:
+        if align == 'left':
+            x = kwargs['margin_left']
+        elif align == 'center':
+            x = (img.size[0] - w) // 2
+        elif align == 'right':
+            x = img.size[0] - w - kwargs['margin_right']
+        else:
+            raise ValueError("Invalid align value. Choose from 'left', 'center', or 'right'.")
+
+        draw.text((x,y), t, font=font, fill=kwargs['fill_color'])
+        y += h
+
+    return img
+
+
 def create_label_im(text, **kwargs):
     im_font = ImageFont.truetype(kwargs['font_path'], kwargs['font_size'])
     im = Image.new('L', (20, 20), 'white')
     draw = ImageDraw.Draw(im)
-    # workaround for a bug in multiline_textsize()
-    # when there are empty lines in the text:
+
     lines = []
     for line in text.split('\n'):
         if line == '': line = ' '
         lines.append(line)
     text = '\n'.join(lines)
-    #linesize = im_font.getbbox(text)
+
     textsize = draw.multiline_textbbox(xy=(0,0),text=text, font=im_font)
     width, height = kwargs['width'], kwargs['height']
     im = Image.new('RGB', (width*10, height*10), 'white')
@@ -111,7 +161,11 @@ def create_label_im(text, **kwargs):
     horizontal_offset = max((width - textsize[2])//2, 0)
     horizontal_offset = kwargs['margin_left'] - kwargs['margin_right']
     offset = horizontal_offset, vertical_offset
-    draw.multiline_text(offset, text, kwargs['fill_color'], font=im_font, align=kwargs['align'])
+    
+    draw_multiline_text(im, text, im_font, kwargs, offset)
+    # im.show()
+    
+    #draw.multiline_text(offset, text, kwargs['fill_color'], font=im_font, align=kwargs['align'])
     return im
 
 def create_label_grocy(kwargs):
@@ -133,28 +187,27 @@ def create_label_grocy(kwargs):
     
     # Berechnung der Pixel basierend auf DPI
     label_size_px = (int(label_size_mm[0] / 25.4 * dpi), int(label_size_mm[1] / 25.4 * dpi))
-
+    width, height = label_size_mm
+    
     # Erstelle das Label-Bild
     label_image = Image.new("RGB", label_size_px, "white")
     draw = ImageDraw.Draw(label_image)
 
-    desired_font_height_mm = 6
     # Schriftart laden (Systemschrift oder Standardschrift)
     try:
-        font_size = int(desired_font_height_mm / 25.4 * dpi)  # Schriftgröße: 8 mm (entspricht ~22.7 pt bei 300 DPI)
-        font = ImageFont.truetype(kwargs['font_path'], font_size)
+        im_font = ImageFont.truetype(kwargs['font_path'], kwargs['font_size'])
     except IOError:
-        font = ImageFont.load_default()
+        im_font = ImageFont.load_default()
+    
+    textsize = draw.multiline_textbbox(xy=(0,0),text=kwargs['product'], font=im_font)
+    
+    vertical_offset  = (height - textsize[1])//2
+    vertical_offset += (kwargs['margin_top'] - kwargs['margin_bottom'])//2
+    horizontal_offset = max((width - textsize[2])//2, 0)
+    horizontal_offset = kwargs['margin_left'] - kwargs['margin_right']
+    offset = horizontal_offset, vertical_offset
 
-
-    # Text hinzufügen (1. und 2. Zeile)
-    y_offset = int(1.5 / 25.4 * dpi)  # Oberer Rand: 3 mm
-    for line in text_lines[:2]:  # Maximal 2 Zeilen
-        text_width = draw.textlength(line, font=font)
-        text_height = font_size
-        x_offset = (label_size_px[0] - text_width) // 2  # Zentrierung
-        draw.text((x_offset, y_offset), line, fill="black", font=font)
-        y_offset += text_height + int(3 / 25.4 * dpi)  # Abstand zwischen den Zeilen
+    draw_multiline_text(label_image, f"{kwargs['product']} {kwargs['duedate']}", im_font, kwargs, offset)
 
     # Barcode hinzufügen
     barcode_class = Code128(barcode_data, writer=ImageWriter())
