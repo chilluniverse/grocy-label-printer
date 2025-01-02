@@ -6,7 +6,7 @@
     "ADDITIONAL_FONT_FOLDER": false
   },
   "PRINTER": {
-    "PRINTER": "Printer_Name_Here",
+    "PRINTER": "Printer_Name_Here"
   },
   "LABEL": {
     "DEFAULT_SIZE": "57x32",
