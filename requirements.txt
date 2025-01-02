@@ -1,0 +1,6 @@
+python-barcode==0.15.1
+bottle==0.13.2
+Pillow==11.1.0
+pycups==2.0.4
+pygrocy==2.1.0
+PyPDF2==3.0.1
