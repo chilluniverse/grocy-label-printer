@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 LABEL_SIZES = [
     ('57x32', '57mm x 32mm'),
-    ('50x23', '50mm x 23mm')
-    ]
+    ('54x25', '54mm x 25mm')
+]
 
 try:
     with open('config.json', encoding='utf-8') as fh:
