@@ -1,3 +1,6 @@
-brother_ql
+python-barcode
 bottle
 jinja2
+PyPDF2
+pycups
+pygrocy
