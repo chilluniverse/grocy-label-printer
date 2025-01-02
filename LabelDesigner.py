@@ -241,11 +241,11 @@ def create_label_grocy(kwargs):
     # Barcode als Bild laden und skalieren
     barcode_pil_img = Image.open(barcode_img_buffer)
     barcode_width, barcode_height = barcode_pil_img.size
-    scale_factor = label_size_px[0] / barcode_width  # Breite anpassen
-    crop = 10
+    
+    crop = 15
     barcode_pil_img = barcode_pil_img.crop((0, crop, barcode_width, barcode_height-crop))
     barcode_pil_img = barcode_pil_img.resize(
-        (label_size_px[0], barcode_height),#int(barcode_height * scale_factor)),
+        (label_size_px[0], label_size_px[1]//2),#int(barcode_height * scale_factor)),
         Image.LANCZOS,  # Verwende direkt LANCZOS für die Skalierung
     )
     
@@ -253,7 +253,8 @@ def create_label_grocy(kwargs):
 
     # Positioniere den Barcode unten auf dem Label
     barcode_x = 0
-    barcode_y = label_size_px[1] - barcode_pil_img.size[1] + 25
+    barcode_y = label_size_px[1] - barcode_pil_img.size[1]
+    barcode_y += 15 if kwargs['width']==57 and kwargs['height']==32 else 0
     label_image.paste(barcode_pil_img, (barcode_x, barcode_y))
 
     return label_image
@@ -324,10 +325,11 @@ def print_grocy():
         if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
             context["product"] = alias_name
     
-    
+    # if context['width']==57 and context['height']==32:
     if context['due_date'] is None:
         context['due_date'] = f"({date.today()})" if context['print_date'] else ""
     else: context['due_date'] = f"({context['due_date']})" if context['print_due_date'] else f"({date.today()})" if context['print_today'] else ""
+    # else: context['due_date'] = ''
     
     if DEBUG: print(context)
     
