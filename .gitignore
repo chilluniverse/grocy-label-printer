@@ -119,3 +119,6 @@ venv.bak/
 
 # Synology System Files
 .DS_Store
+
+# Testing
+testbench.ipynb
