@@ -8,6 +8,7 @@ This is a web service to print labels on Dymo 450 label printers.
 import sys, logging, random, json, argparse
 from io import BytesIO
 import os
+from datetime import date
 
 from bottle import run, route, get, post, response, request, jinja2_view as view, static_file, redirect
 from PIL import Image, ImageDraw, ImageFont
@@ -70,7 +71,7 @@ def get_label_context(request):
       'text':           d.get('text', None),
       'grocycode':      d.get('grocycode', None),
       'product':        d.get('product', None),
-      'duedate':        d.get('due_date', None),
+      'due_date':        d.get('due_date', None),
       'width':          int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[0].rstrip()),
       'height':         int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[2].rstrip()),
       'dpi':            d.get('dpi',300),
@@ -104,49 +105,48 @@ def get_label_context(request):
 def draw_multiline_text(img, text, font, kwargs, offset):
     width = img.size[0] - offset[1]  # Adjust for padding if needed
     draw = ImageDraw.Draw(img)
-    
-    def break_fix(text, width, font, draw):
-        if not text:
-            return
-        lo = 0
-        hi = len(text)
-        while lo < hi:
-            mid = (lo + hi + 1) // 2
-            t = text[:mid]
-            x, y, w, h = draw.textbbox((0, 0), text=t, font=font)
-            if w <= width:
-                lo = mid
-            else:
-                hi = mid - 1
-        t = text[:lo]
-        x, y, w, h = draw.textbbox((0, 0), text=t, font=font)
-        yield t, w, h
-        yield from break_fix(text[lo:], width, font, draw)
-        
-    pieces = list(break_fix(text, width, font, draw))
-    height = sum(p[2] for p in pieces)
 
-    if height > img.size[1]:
-        raise ValueError("text doesn't fit")
+    def break_fix(text, width, font, draw):
+        words = text.split()
+        line = []
+        for word in words:
+            test_line = ' '.join(line + [word])
+            x, y, w, h = draw.textbbox((0, 0), text=test_line, font=font)
+            if w <= width:
+                line.append(word)
+            else:
+                yield ' '.join(line)
+                line = [word]
+        if line:
+            yield ' '.join(line)
+
+    lines = list(break_fix(text, width, font, draw))
+    line_heights = [draw.textbbox((0, 0), text=line, font=font)[3] for line in lines]
+    total_height = sum(line_heights) + (len(line_heights) - 1) * kwargs.get('line_spacing', 0)
+
+    if total_height > img.size[1]:
+        raise ValueError("Text doesn't fit within the image dimensions")
 
     # Start drawing from the top-left corner
-    y = kwargs['margin_top']  # Top margin can be adjusted if needed
+    y = kwargs.get('margin_top', 0)
 
-    align = kwargs['align']
-    for t, w, h in pieces:
+    align = kwargs.get('align', 'left')
+    for i, line in enumerate(lines):
+        x, _, line_width, _ = draw.textbbox((0, 0), text=line, font=font)
         if align == 'left':
-            x = kwargs['margin_left']
+            x = kwargs.get('margin_left', 0)
         elif align == 'center':
-            x = (img.size[0] - w) // 2
+            x = (img.size[0] - line_width) // 2
         elif align == 'right':
-            x = img.size[0] - w - kwargs['margin_right']
+            x = img.size[0] - line_width - kwargs.get('margin_right', 0)
         else:
             raise ValueError("Invalid align value. Choose from 'left', 'center', or 'right'.")
 
-        draw.text((x,y), t, font=font, fill=kwargs['fill_color'], spacing = kwargs['line_spacing'], align = kwargs['align'])
-        y += h #+ int(kwargs['line_spacing'] / 25.4 * 300)  # Abstand zwischen den Zeilen
+        draw.text((x, y), line, font=font, fill=kwargs.get('fill_color', 'black'))
+        y += line_heights[i] + kwargs.get('line_spacing', 0)
 
     return img
+
 
 
 def create_label_im(text, **kwargs):
@@ -187,12 +187,6 @@ def create_label_grocy(kwargs):
     """
 
     barcode_data = kwargs['grocycode']
-    product = grocy.product_by_barcode(barcode_data)
-    alias_name = grocy.get_userfields("products",product.id).get('kurzname', '')
-    if alias_name is not None and 0 < len(alias_name) < len(kwargs["product"]):
-        kwargs["product"] = alias_name
-    print(kwargs['duedate'])
-    print(kwargs["product"])
     label_size_mm = (kwargs['width'],kwargs['height'])
     dpi = kwargs['dpi']
     
@@ -218,7 +212,7 @@ def create_label_grocy(kwargs):
     horizontal_offset = kwargs['margin_left'] - kwargs['margin_right']
     offset = horizontal_offset, vertical_offset
 
-    draw_multiline_text(label_image, f"{kwargs['product']}\n{kwargs['duedate']}", im_font, kwargs, offset)
+    draw_multiline_text(label_image, f"{kwargs['product']}\n{kwargs['due_date']}", im_font, kwargs, offset)
 
     # Barcode hinzufügen
     barcode_class = Code128(barcode_data, writer=ImageWriter())
@@ -232,19 +226,24 @@ def create_label_grocy(kwargs):
     barcode_img_buffer = BytesIO()
     barcode_class.write(barcode_img_buffer, options=barcode_options)
     barcode_img_buffer.seek(0)
+    
 
     # Barcode als Bild laden und skalieren
     barcode_pil_img = Image.open(barcode_img_buffer)
     barcode_width, barcode_height = barcode_pil_img.size
     scale_factor = label_size_px[0] / barcode_width  # Breite anpassen
+    crop = 10
+    barcode_pil_img = barcode_pil_img.crop((0, crop, barcode_width, barcode_height-crop))
     barcode_pil_img = barcode_pil_img.resize(
         (label_size_px[0], barcode_height),#int(barcode_height * scale_factor)),
         Image.LANCZOS,  # Verwende direkt LANCZOS für die Skalierung
     )
+    
+    if DEBUG: barcode_pil_img.save(f"{barcode_data}.png")
 
     # Positioniere den Barcode unten auf dem Label
     barcode_x = 0
-    barcode_y = label_size_px[1] - barcode_pil_img.size[1] + 15
+    barcode_y = label_size_px[1] - barcode_pil_img.size[1] + 25
     label_image.paste(barcode_pil_img, (barcode_x, barcode_y))
 
     return label_image
@@ -309,8 +308,15 @@ def print_grocy():
         return_dict['error'] = 'Please provide the product for the label'
         return return_dict
     
-    if context['duedate'] is None:
-        context['duedate'] = ""
+    product = grocy.product_by_barcode(context['grocycode'])
+    alias_name = grocy.get_userfields("products",product.id).get('kurzname', '')
+    if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
+        context["product"] = alias_name
+    
+    if context['due_date'] is None:
+        context['due_date'] = f"({date.today()})"
+    else:
+        context['due_date'] = f"({context['due_date']})"
     
     if DEBUG: print(context)
     
