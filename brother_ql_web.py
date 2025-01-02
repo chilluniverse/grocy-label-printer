@@ -17,6 +17,8 @@ from barcode.writer import ImageWriter
 from PyPDF2 import PdfReader, PdfWriter
 import cups
 
+from pygrocy import Grocy
+
 from font_helpers import get_fonts
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,9 @@ try:
 except FileNotFoundError as e:
     with open('config.example.json', encoding='utf-8') as fh:
         CONFIG = json.load(fh)
+
+if CONFIG['GROCY']['ENABLE']:
+    grocy = Grocy(CONFIG['GROCY']['URI'], CONFIG['GROCY']['API_KEY'], port = CONFIG['GROCY']['PORT'], verify_ssl = CONFIG['GROCY']['SSL'])
 
 @route('/')
 def index():
@@ -58,11 +63,14 @@ def get_label_context(request):
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
     
+    if DEBUG: 
+        for key in d: print(key+":"+d.get(key))
+        
     context = {
       'text':           d.get('text', None),
       'grocycode':      d.get('grocycode', None),
       'product':        d.get('product', None),
-      'duedate':        d.get('duedate', None),
+      'duedate':        d.get('due_date', None),
       'width':          int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[0].rstrip()),
       'height':         int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[2].rstrip()),
       'dpi':            d.get('dpi',300),
@@ -135,8 +143,8 @@ def draw_multiline_text(img, text, font, kwargs, offset):
         else:
             raise ValueError("Invalid align value. Choose from 'left', 'center', or 'right'.")
 
-        draw.text((x,y), t, font=font, fill=kwargs['fill_color'])
-        y += h + int(kwargs['line_spacing'] / 25.4 * 300)  # Abstand zwischen den Zeilen
+        draw.text((x,y), t, font=font, fill=kwargs['fill_color'], spacing = kwargs['line_spacing'], align = kwargs['align'])
+        y += h #+ int(kwargs['line_spacing'] / 25.4 * 300)  # Abstand zwischen den Zeilen
 
     return img
 
@@ -178,9 +186,13 @@ def create_label_grocy(kwargs):
     :return: PIL-Image des Labels
     """
 
-    text_lines = [kwargs['product'],kwargs['duedate']]
-    print(text_lines)
     barcode_data = kwargs['grocycode']
+    product = grocy.product_by_barcode(barcode_data)
+    alias_name = grocy.get_userfields("products",product.id).get('kurzname', '')
+    if alias_name is not None and 0 < len(alias_name) < len(kwargs["product"]):
+        kwargs["product"] = alias_name
+    print(kwargs['duedate'])
+    print(kwargs["product"])
     label_size_mm = (kwargs['width'],kwargs['height'])
     dpi = kwargs['dpi']
     
@@ -206,7 +218,7 @@ def create_label_grocy(kwargs):
     horizontal_offset = kwargs['margin_left'] - kwargs['margin_right']
     offset = horizontal_offset, vertical_offset
 
-    draw_multiline_text(label_image, f"{kwargs['product']} {kwargs['duedate']}", im_font, kwargs, offset)
+    draw_multiline_text(label_image, f"{kwargs['product']}\n{kwargs['duedate']}", im_font, kwargs, offset)
 
     # Barcode hinzufügen
     barcode_class = Code128(barcode_data, writer=ImageWriter())
@@ -366,6 +378,8 @@ def main():
     parser.add_argument('--font-folder', default=False, help='folder for additional .ttf/.otf fonts')
     parser.add_argument('--default-label-size', default=False, help='Label size inserted in your printer. Defaults to 57x32.')
     parser.add_argument('--default-orientation', default=False, choices=('standard', 'rotated'), help='Label orientation, defaults to "standard". To turn your text by 90°, state "rotated".')
+    parser.add_argument('--grocy', default=False, help="URI of your grocy instance")
+    parser.add_argument('--api', default=False, help="Grocy API-Key")
     parser.add_argument('printer',  nargs='?', default=False, help='String descriptor for the printer to use (like tcp://192.168.0.23:9100 or file:///dev/usb/lp0)')
     args = parser.parse_args()
 
@@ -397,8 +411,7 @@ def main():
         ADDITIONAL_FONT_FOLDER = args.font_folder
     else:
         ADDITIONAL_FONT_FOLDER = CONFIG['SERVER']['ADDITIONAL_FONT_FOLDER']
-
-
+        
     logging.basicConfig(level=LOGLEVEL)
 
     FONTS = get_fonts()
@@ -424,6 +437,6 @@ def main():
         sys.stderr.write('The default font is now set to: {family} ({style})\n'.format(**CONFIG['LABEL']['DEFAULT_FONTS']))
 
     run(host=CONFIG['SERVER']['HOST'], port=PORT, debug=DEBUG)
-
+    
 if __name__ == "__main__":
     main()
