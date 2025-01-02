@@ -22,5 +22,16 @@
     "HTML_TITLE": "Label Designer",
     "PAGE_TITLE": "Quax's Label Designer",
     "PAGE_HEADLINE": "Design and print all your homelab Labels"
+  },
+  "GROCY": {
+    "ENABLE": true,
+    "URI": "http://grocy.local",
+    "API_KEY": "YOUR_API_KEY",
+    "PORT": 9283,
+    "SSL": false,
+    "PRINT_ALIAS": "1",
+    "PRINT_DUE_DATE": "1",
+    "PRINT_TODAY": "1",
+    "PRINT_DATE": "1"
   }
 }

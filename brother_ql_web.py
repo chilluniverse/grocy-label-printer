@@ -64,10 +64,10 @@ def get_label_context(request):
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
     
-    print_alias =    False if int(d.get('print_alias', '1')) == 0    else True
-    print_due_date = False if int(d.get('print_due_date', '1')) == 0 else True
-    print_today =    False if int(d.get('print_today', '1')) == 0    else True
-    print_date =     False if int(d.get('print_date', '1')) == 0     else True
+    print_alias =    False if int(d.get('print_alias', CONFIG['GROCY']['PRINT_ALIAS'])) == 0       else True
+    print_due_date = False if int(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])) == 0 else True
+    print_today =    False if int(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])) == 0       else True
+    print_date =     False if int(d.get('print_date', CONFIG['GROCY']['PRINT_DATE'])) == 0         else True
     
     if DEBUG: 
         for key in d: print(key+":"+d.get(key))
