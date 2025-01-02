@@ -32,14 +32,6 @@
             "index": "pypi",
             "version": "==0.12.19"
         },
-        "brother-ql": {
-            "hashes": [
-                "sha256:1a7a3faa56924c4e7670da82016486fc310af339acb2ffb98bd863a2667ab2c2",
-                "sha256:1f5c57a039f012c9c204397f470001f76ebb7483421ebde985d0cb3c614e8660"
-            ],
-            "index": "pypi",
-            "version": "==0.9.4"
-        },
         "click": {
             "hashes": [
                 "sha256:8c04c11192119b1ef78ea049e0a6f0463e4c48ef00a30160c704337586f3ad7a",
