@@ -64,6 +64,11 @@ def get_label_context(request):
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
     
+    print_alias =    False if int(d.get('print_alias', '1')) == 0    else True
+    print_due_date = False if int(d.get('print_due_date', '1')) == 0 else True
+    print_today =    False if int(d.get('print_today', '1')) == 0    else True
+    print_date =     False if int(d.get('print_date', '1')) == 0     else True
+    
     if DEBUG: 
         for key in d: print(key+":"+d.get(key))
         
@@ -71,7 +76,12 @@ def get_label_context(request):
       'text':           d.get('text', None),
       'grocycode':      d.get('grocycode', None),
       'product':        d.get('product', None),
-      'due_date':        d.get('due_date', None),
+      'print_alias':    print_alias,
+      'due_date':       d.get('due_date', None),
+      'print_due_date': print_due_date,
+      'print_today':    print_today,
+      'print_date':     print_date,
+      'alias_userfield':d.get('alias_userfield', 'kurzname'),
       'width':          int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[0].rstrip()),
       'height':         int(d.get('label_size', CONFIG['LABEL']['DEFAULT_SIZE']).rpartition('x')[2].rstrip()),
       'dpi':            d.get('dpi',300),
@@ -82,7 +92,7 @@ def get_label_context(request):
       'margin_bottom':  float(d.get('margin_bottom', 0)),
       'margin_left':    float(d.get('margin_left',   0)),
       'margin_right':   float(d.get('margin_right',  0)),
-      'line_spacing':   float(d.get('line_spacing', 0)),
+      'line_spacing':   float(d.get('line_spacing', 8)),
       'align':          d.get('align', 'center')
     }
     
@@ -308,15 +318,16 @@ def print_grocy():
         return_dict['error'] = 'Please provide the product for the label'
         return return_dict
     
-    product = grocy.product_by_barcode(context['grocycode'])
-    alias_name = grocy.get_userfields("products",product.id).get('kurzname', '')
-    if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
-        context["product"] = alias_name
+    if context['print_alias']:
+        product = grocy.product_by_barcode(context['grocycode'])
+        alias_name = grocy.get_userfields("products",product.id).get(context['alias_userfield'])
+        if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
+            context["product"] = alias_name
+    
     
     if context['due_date'] is None:
-        context['due_date'] = f"({date.today()})"
-    else:
-        context['due_date'] = f"({context['due_date']})"
+        context['due_date'] = f"({date.today()})" if context['print_date'] else ""
+    else: context['due_date'] = f"({context['due_date']})" if context['print_due_date'] else f"({date.today()})" if context['print_today'] else ""
     
     if DEBUG: print(context)
     
@@ -327,6 +338,7 @@ def print_grocy():
         try:
             cups_connection = cups.Connection()
             cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], f"{context['grocycode']}.pdf", "DYMO Label", {'choice': 'auto-fit'})
+            os.remove(f"{context['grocycode']}.pdf")
             del cups_connection
         except Exception as e:
             return_dict['message'] = str(e)
