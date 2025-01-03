@@ -63,6 +63,26 @@
                       <input type="radio" name="fontAlign" onchange="preview()" value="right" aria-label="Right Align"><span class="glyphicon glyphicon-align-right" aria-hidden="true"></span>
                   </label>
               </div>
+              <div class="btn-group" data-toggle="buttons">
+                  <label class="btn btn-default active">
+                      <input type="radio" name="fontAlign_vertical" onchange="preview()" value="top" aria-label="Top Align" checked=""><span class="glyphicon glyphicon-object-align-top" aria-hidden="true"></span>
+                  </label>
+                  <label class="btn btn-default">
+                      <input type="radio" name="fontAlign_vertical" onchange="preview()" value="center" aria-label="Center Align"><span class="glyphicon glyphicon-object-align-horizontal" aria-hidden="true"></span>
+                  </label>
+                  <label class="btn btn-default">
+                      <input type="radio" name="fontAlign_vertical" onchange="preview()" value="bottom" aria-label="Bottom Align"><span class="glyphicon glyphicon-object-align-bottom" aria-hidden="true"></span>
+                  </label>
+              </div>
+              <label for="distribute_lines" class="control-label input-group">Distribute Lines vertically:</label>
+              <div class="btn-group" data-toggle="buttons">
+                  <label class="btn btn-default active">
+                      <input type="radio" name="distribute_lines" onchange="preview()" value="false" aria-label="Dont Distribute Lines vertically" checked=""><span class="glyphicon glyphicon-resize-small" aria-hidden="true"></span>
+                  </label>
+                  <label class="btn btn-default">
+                      <input type="radio" name="distribute_lines" onchange="preview()" value="true" aria-label="Distribute Lines vertically"><span class="glyphicon glyphicon-resize-full" aria-hidden="true"></span>
+                  </label>
+              </div>
               </div> <!-- class="chooser panel-body" -->
             </div>
           </div>
@@ -230,19 +250,21 @@ function formData() {
   var grcyProductValue = $('#grcyProduct option:selected').val();
 
   return {
-    text:        text,
-    font_family: $('#fontFamily option:selected').text(),
-    font_size:   $('#fontSize').val(),
-    label_size:  $('#labelSize option:selected').val(),
-    align:       $('input[name=fontAlign]:checked').val(),
-    margin_top:    $('#marginTop').val(),
-    margin_bottom: $('#marginBottom').val(),
-    margin_left:   $('#marginLeft').val(),
-    margin_right:  $('#marginRight').val(),
-    printGrocy:  $('#printGrocy').prop('checked'),
-    numCopies:   $('#numBarcodeCopies').val(),
-    grocycode:    'grcy:p:' + grcyProductValue,
-    print_date:  $('input[name=printDate]:checked').val(),
+    text:           text,
+    font_family:    $('#fontFamily option:selected').text(),
+    font_size:      $('#fontSize').val(),
+    label_size:     $('#labelSize option:selected').val(),
+    align:          $('input[name=fontAlign]:checked').val(),
+    vertical_align: $('input[name=fontAlign_vertical]:checked').val(),
+    distribute_lines: $('input[name=distribute_lines]:checked').val(),
+    margin_top:     $('#marginTop').val(),
+    margin_bottom:  $('#marginBottom').val(),
+    margin_left:    $('#marginLeft').val(),
+    margin_right:   $('#marginRight').val(),
+    printGrocy:     $('#printGrocy').prop('checked'),
+    numCopies:      $('#numBarcodeCopies').val(),
+    grocycode:      'grcy:p:' + grcyProductValue,
+    print_date:     $('input[name=printDate]:checked').val(),
   }
 }
 
