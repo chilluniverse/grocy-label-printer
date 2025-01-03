@@ -74,13 +74,13 @@
                       <input type="radio" name="fontAlign_vertical" onchange="preview()" value="bottom" aria-label="Bottom Align"><span class="glyphicon glyphicon-object-align-bottom" aria-hidden="true"></span>
                   </label>
               </div>
-              <label for="distribute_lines" class="control-label input-group">Distribute Lines vertically:</label>
+              <label for="distribute_vertically" class="control-label input-group">Distribute Lines vertically:</label>
               <div class="btn-group" data-toggle="buttons">
                   <label class="btn btn-default active">
-                      <input type="radio" name="distribute_lines" onchange="preview()" value="false" aria-label="Dont Distribute Lines vertically" checked=""><span class="glyphicon glyphicon-resize-small" aria-hidden="true"></span>
+                      <input type="radio" name="distribute_vertically" onchange="preview()" value="false" aria-label="Dont Distribute Lines vertically" checked=""><span class="glyphicon glyphicon-resize-small" aria-hidden="true"></span>
                   </label>
                   <label class="btn btn-default">
-                      <input type="radio" name="distribute_lines" onchange="preview()" value="true" aria-label="Distribute Lines vertically"><span class="glyphicon glyphicon-resize-full" aria-hidden="true"></span>
+                      <input type="radio" name="distribute_vertically" onchange="preview()" value="true" aria-label="Distribute Lines vertically"><span class="glyphicon glyphicon-resize-full" aria-hidden="true"></span>
                   </label>
               </div>
               </div> <!-- class="chooser panel-body" -->
@@ -256,7 +256,7 @@ function formData() {
     label_size:     $('#labelSize option:selected').val(),
     align:          $('input[name=fontAlign]:checked').val(),
     vertical_align: $('input[name=fontAlign_vertical]:checked').val(),
-    distribute_lines: $('input[name=distribute_lines]:checked').val(),
+    distribute_vertically: $('input[name=distribute_vertically]:checked').val(),
     margin_top:     $('#marginTop').val(),
     margin_bottom:  $('#marginBottom').val(),
     margin_left:    $('#marginLeft').val(),
