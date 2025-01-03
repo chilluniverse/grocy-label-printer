@@ -75,6 +75,9 @@ def change_grocy_context(context):
         context["product"] = product.name if context["product"] == None else context["product"]
         if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
             context["product"] = alias_name
+
+    if context['text'] is not None:
+        context['product'] =  context['text'] if context['text'] != ' ' else context['product']
     
     if context['print_date']:
         if context['due_date'] is None:
@@ -104,7 +107,7 @@ def get_label_context(request):
         
     context = {
       'text':           d.get('text', None),
-      'numCopies':      d.get('numCopies', 1),
+      'numCopies':      int(d.get('numCopies', 1)),
       'printGrocy':     printGrocy,
       'grocycode':      d.get('grocycode', None),
       'product':        d.get('product', None),
@@ -261,8 +264,6 @@ def create_label_grocy(kwargs):
     barcode_data = kwargs['grocycode']
     label_size_mm = (kwargs['width'],kwargs['height'])
     dpi = kwargs['dpi']
-
-    kwargs['product'] =  kwargs['text'] if kwargs['text'] is not None and not ' ' else kwargs['product']
     
     # Berechnung der Pixel basierend auf DPI
     label_size_px = (int(label_size_mm[0] / 25.4 * dpi), int(label_size_mm[1] / 25.4 * dpi))
@@ -464,7 +465,7 @@ def print_text():
     if context['printGrocy']:
         context = change_grocy_context(context)
         im = create_label_grocy(context)
-        image_to_pdf(im, context['grocycode'])
+        image_to_pdf(im, context['grocycode'], context['numCopies'])
         im = f"{context['grocycode']}.pdf"
         
     else:
@@ -473,13 +474,13 @@ def print_text():
             return return_dict
         
         im = create_label_im(**context)
-        
-        if DEBUG: im.save('sample-out.png')
+        image_to_pdf(im, context['text'], context['numCopies'])
+        im = f"{context['text']}.pdf"
     
     if not DEBUG:
         try:
             return_dict['message'] = print_file(im)
-            
+            os.remove(im)
         except (Exception, cups.IPPError) as e:
             return_dict['message'] = str(e)
             logger.warning('Exception happened: %s', e)
