@@ -117,7 +117,7 @@
               <label for="searchBox">Search Item:</label>
               <input id="searchBox" type="text" class="form-control" placeholder="Search Product..." onkeyup="filterList()" onclick="showProductList()">
               <select class="form-control" id="grcyProduct" onChange="preview()">
-                {% for grcy_product in grcy_products %}<option value="{{grcy_product[0]}}" {% if label['DEFAULT_SIZE'] == grcy_product[0] %}selected{% endif %}>{{grcy_product[1]}}</option>{% endfor %}
+                {% for grcy_product in grcy_products %}<option value="{{grcy_product[0]}}">{{grcy_product[1]}}</option>{% endfor %}
               </select>
               <ul id="grcyProduct_list" class="list-group" style="max-height: 200px; overflow-y: auto; display: none;">
                 {% for grcy_product in grcy_products %}
