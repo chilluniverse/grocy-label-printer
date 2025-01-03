@@ -96,7 +96,7 @@ def get_label_context(request):
     print_due_date = False if str(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])).lower() == 'false' else True
     print_today =    False if str(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])).lower() == 'false'       else True
     
-    distribute_lines = False if str(d.get('distribute_lines', 'false')).lower() == 'false' else True
+    distribute_vertically = False if str(d.get('distribute_vertically', 'false')).lower() == 'false' else True
     
     if DEBUG: 
         for key in d: print(key+":"+d.get(key))
@@ -127,7 +127,7 @@ def get_label_context(request):
       'align':          d.get('align', 'center'),
       'vertical_align': d.get('vertical_align', 'top'),
       'topHalf':        d.get('topHalf', False),
-      'distribute_lines': distribute_lines
+      'distribute_vertically': distribute_vertically
     }
     
     context['fill_color'] = (0, 0, 0)
@@ -173,25 +173,33 @@ def draw_multiline_text(img, text, font, kwargs, offset):
     line_heights = [draw.textbbox((0, 0), text=line, font=font)[3] for line in lines]
     total_text_height = sum(line_heights)
 
-    # Calculate the total spacing required
-    num_gaps = len(lines) + 1  # gaps between lines + gaps at top and bottom
-    available_space = (img.size[1]*1.15 // 2 if kwargs.get('topHalf', False) else img.size[1]) - total_text_height
+    # Determine available space based on `topHalf`
+    max_height = img.size[1]*1.1 // 2 if kwargs.get('topHalf', False) else img.size[1]
+    available_space = max_height - total_text_height
 
     if available_space < 0:
         raise ValueError("Text doesn't fit within the allowed dimensions")
 
-    gap_size = available_space // num_gaps
-
-    vertical_align = kwargs.get('vertical_align', 'top')
-    if vertical_align == 'top':
-        y = kwargs.get('margin_top', 0) + gap_size
-    elif vertical_align == 'center':
+    # Determine gap size if vertical distribution is enabled
+    distribute_vertically = kwargs.get('distribute_vertically', False)
+    if distribute_vertically:
+        num_gaps = len(lines) + 1  # gaps between lines + gaps at top and bottom
+        gap_size = available_space // num_gaps
         y = gap_size
-    elif vertical_align == 'bottom':
-        y = available_space - gap_size * (len(lines) + 1) + kwargs.get('margin_bottom', 0)
     else:
-        raise ValueError("Invalid vertical_align value. Choose from 'top', 'center', or 'bottom'.")
+        # Handle vertical alignment
+        vertical_align = kwargs.get('vertical_align', 'top')
+        if vertical_align == 'top':
+            y = kwargs.get('margin_top', 0)
+        elif vertical_align == 'center':
+            y = (max_height - total_text_height) // 2
+        elif vertical_align == 'bottom':
+            y = max_height - total_text_height - kwargs.get('margin_bottom', 0)
+        else:
+            raise ValueError("Invalid vertical_align value. Choose from 'top', 'center', or 'bottom'.")
+        gap_size = 0  # No additional gaps for non-distributed alignment
 
+    # Handle horizontal alignment and draw each line
     align = kwargs.get('align', 'left')
     for i, line in enumerate(lines):
         x, _, line_width, _ = draw.textbbox((0, 0), text=line, font=font)
@@ -208,6 +216,7 @@ def draw_multiline_text(img, text, font, kwargs, offset):
         y += line_heights[i] + gap_size
 
     return img
+
 
 
 
