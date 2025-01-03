@@ -56,7 +56,16 @@ def labeldesigner():
             'fonts': FONTS,
             'label_sizes': LABEL_SIZES,
             'website': CONFIG['WEBSITE'],
-            'label': CONFIG['LABEL']}
+            'label': CONFIG['LABEL'],
+            'grcy_products' : get_grocy_products()
+            }
+    
+def get_grocy_products():
+    all_products = grocy.all_products()
+    product_list = []
+    for product in all_products:
+        product_list.append([product.id,product.name])
+    return product_list
 
 def get_label_context(request):
     """ might raise LookupError() """
@@ -64,7 +73,8 @@ def get_label_context(request):
 
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
-    
+
+    printGrocy = False if str(d.get('printGrocy', 'false')).lower() == 'false' else True
     print_alias =    False if int(d.get('print_alias', CONFIG['GROCY']['PRINT_ALIAS'])) == 0       else True
     print_due_date = False if int(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])) == 0 else True
     print_today =    False if int(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])) == 0       else True
@@ -75,6 +85,8 @@ def get_label_context(request):
         
     context = {
       'text':           d.get('text', None),
+      'numCopies':      d.get('numCopies', 1),
+      'printGrocy':     printGrocy,
       'grocycode':      d.get('grocycode', None),
       'product':        d.get('product', None),
       'print_alias':    print_alias,
@@ -111,6 +123,20 @@ def get_label_context(request):
 
     context['font_path'] = get_font_path(context['font_family'], context['font_style'])
 
+    return context
+
+def change_grocy_context(context):
+    if context['print_alias']:
+        product = grocy.product_by_barcode(context['grocycode'])
+        alias_name = grocy.get_userfields("products",product.id).get(context['alias_userfield'])
+        context["product"] = product.name if context["product"] == None else context["product"]
+        if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
+            context["product"] = alias_name
+        
+    if context['due_date'] is None:
+        context['due_date'] = f"({date.today()})" if context['print_date'] else ""
+    else: context['due_date'] = f"({context['due_date']})" if context['print_due_date'] else f"({date.today()})" if context['print_today'] else ""
+    
     return context
 
 def draw_multiline_text(img, text, font, kwargs, offset):
@@ -255,7 +281,7 @@ def create_label_grocy(kwargs):
         Image.LANCZOS,  # Verwende direkt LANCZOS für die Skalierung
     )
     
-    if DEBUG: barcode_pil_img.save(f"{barcode_data}.png")
+    if DEBUG: barcode_pil_img.save(f"{barcode_data}_barcode.png")
 
     # Positioniere den Barcode unten auf dem Label
     barcode_x = 0
@@ -288,7 +314,19 @@ def image_to_pdf(label_image, output_file="label", num_copies = 1):
 @post('/api/preview/text')
 def get_preview_image():
     context = get_label_context(request)
-    im = create_label_im(**context)
+    
+    if context['printGrocy']:
+        context = change_grocy_context(context)
+        if context['text'] is not ' ':
+            context['product'] = context['text']
+        im = create_label_grocy(context)
+        if DEBUG: 
+            print(context)
+            im.save(f"{context['grocycode']}.png", "png")
+        
+    else:
+        im = create_label_im(**context)
+        
     return_format = request.query.get('return_format', 'png')
     if return_format == 'base64':
         import base64
@@ -325,17 +363,7 @@ def print_grocy():
         return_dict['error'] = 'Please provide the product for the label'
         return return_dict
     
-    if context['print_alias']:
-        product = grocy.product_by_barcode(context['grocycode'])
-        alias_name = grocy.get_userfields("products",product.id).get(context['alias_userfield'])
-        if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
-            context["product"] = alias_name
-    
-    # if context['width']==57 and context['height']==32:
-    if context['due_date'] is None:
-        context['due_date'] = f"({date.today()})" if context['print_date'] else ""
-    else: context['due_date'] = f"({context['due_date']})" if context['print_due_date'] else f"({date.today()})" if context['print_today'] else ""
-    # else: context['due_date'] = ''
+    context = change_grocy_context(context)
     
     if DEBUG: print(context)
     
