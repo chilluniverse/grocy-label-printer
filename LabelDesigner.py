@@ -9,6 +9,7 @@ import sys, logging, random, json, argparse
 from io import BytesIO
 import os
 from datetime import date
+import re
 
 from bottle import run, route, get, post, response, request, jinja2_view as view, static_file, redirect
 from PIL import Image, ImageDraw, ImageFont
@@ -116,17 +117,22 @@ def draw_multiline_text(img, text, font, kwargs, offset):
     width = img.size[0] - offset[1]  # Adjust for padding if needed
     draw = ImageDraw.Draw(img)
 
+    def tokenize(text):
+        # Split text into tokens where everything in parentheses is treated as one word
+        pattern = r'\([^)]*\)|\S+'
+        return re.findall(pattern, text)
+
     def break_fix(text, width, font, draw):
-        words = text.split()
+        tokens = tokenize(text)
         line = []
-        for word in words:
-            test_line = ' '.join(line + [word])
+        for token in tokens:
+            test_line = ' '.join(line + [token])
             x, y, w, h = draw.textbbox((0, 0), text=test_line, font=font)
             if w <= width:
-                line.append(word)
+                line.append(token)
             else:
                 yield ' '.join(line)
-                line = [word]
+                line = [token]
         if line:
             yield ' '.join(line)
 
@@ -227,7 +233,7 @@ def create_label_grocy(kwargs):
     # Barcode hinzufügen
     barcode_class = Code128(barcode_data, writer=ImageWriter())
     barcode_options = {
-        "module_width": 0.3,  # Breite eines Moduls in mm
+        "module_width": 0.4,  # Breite eines Moduls in mm
         "module_height": 15,  # Höhe des Barcodes: 15 mm
         "quiet_zone": 0,  # Abstand links und rechts
         "font_size": 1,  # Keine Schrift unter dem Barcode
