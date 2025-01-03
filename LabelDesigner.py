@@ -9,6 +9,7 @@ import sys, logging, random, json, argparse
 from io import BytesIO
 import os
 from datetime import date
+import time
 import re
 
 from bottle import run, route, get, post, response, request, jinja2_view as view, static_file, redirect
@@ -260,6 +261,7 @@ def create_label_grocy(kwargs):
     barcode_data = kwargs['grocycode']
     label_size_mm = (kwargs['width'],kwargs['height'])
     dpi = kwargs['dpi']
+    kwargs['product'] =  kwargs['text'] if kwargs['text'] != ' ' else kwargs['product']
     
     # Berechnung der Pixel basierend auf DPI
     label_size_px = (int(label_size_mm[0] / 25.4 * dpi), int(label_size_mm[1] / 25.4 * dpi))
@@ -284,6 +286,7 @@ def create_label_grocy(kwargs):
     offset = horizontal_offset, vertical_offset
     
     kwargs['topHalf'] = True
+    kwargs['distribute_vertically'] = True
 
     draw_multiline_text(label_image, f"{kwargs['product']}\n{kwargs['due_date']}", im_font, kwargs, offset)
 
@@ -348,8 +351,6 @@ def get_preview_image():
     
     if context['printGrocy']:
         context = change_grocy_context(context)
-        if context['text'] != ' ':
-            context['product'] = context['text']
         im = create_label_grocy(context)
         if DEBUG: 
             print(context)
@@ -379,7 +380,7 @@ def print_grocy():
     """
     API endpoint to consume the grocy label webhook.
 
-    returns; JSON
+    returns: JSON
     """
 
     return_dict = {'success' : False }
@@ -419,15 +420,6 @@ def print_grocy():
 @post('/api/print/text')
 @get('/api/print/text')
 def print_text():
-    """
-    API to print a label
-
-    returns: JSON
-
-    Ideas for additional URL parameters:
-    - alignment
-    """
-
     return_dict = {'success': False}
 
     try:
@@ -435,19 +427,57 @@ def print_text():
     except LookupError as e:
         return_dict['error'] = e.msg
         return return_dict
-    if context['text'] is None:
-        return_dict['error'] = 'Please provide the text for the label'
-        return return_dict
-
-    im = create_label_im(**context)
-    if DEBUG: im.save('sample-out.png')
+    
+    if context['printGrocy']:
+        context = change_grocy_context(context)
+        im = create_label_grocy(context)
+        image_to_pdf(im, context['grocycode'])
+        im = f"{context['grocycode']}.pdf"
+        
+    else:
+        if context['text'] is None:
+            return_dict['error'] = 'Please provide the text for the label'
+            return return_dict
+        
+        im = create_label_im(**context)
+        
+        if DEBUG: im.save('sample-out.png')
     
     if not DEBUG:
         try:
             cups_connection = cups.Connection()
-            cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], im, "DYMO Label", {'choice': 'auto-fit'})
+            job_id = cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], im, "DYMO Label", {'choice': 'auto-fit'})
+
+            # Get the job status
+            job_info = cups_connection.getJobAttributes(job_id)
+
+            if job_info:
+                logger.info(f"Monitoring Print Job ID: {job_id}")
+                while True:
+                    # Fetch the updated job info
+                    job_info = cups_connection.getJobAttributes(job_id)
+
+                    # Check if the job is still active
+                    if job_info['job-state'] in [1, 3, 4]:  # 1: pending, 3: processing, 4: stopped
+                        logger.info(f"Print Job ID: {job_id}, Status: {job_info['job-state-reasons']}")
+                    elif job_info['job-state'] in [5, 9]: # 5: printing, 9: print finished
+                        logger.info(f"Print Job ID: {job_id}, Final Status: {job_info['job-state-reasons']}")
+                        break
+                    else:
+                        return_dict['message'] = str(job_info['job-state-reasons'])
+                        logger.warning(f'Print Job ID: {job_id}, ERROR Status {job_info['job-state-reasons']}')
+                        return return_dict
+                    
+                    # Wait for a few seconds before checking again
+                    time.sleep(2)
+            else:
+                return_dict['message'] = f"Print Job: no job found with ID {job_id}"
+                logger.warning(f"Print Job: no job found with ID {job_id}")
+            
+            return_dict['message'] = "Job ID: " + str(job_id)
             del cups_connection
-        except Exception as e:
+            
+        except (Exception, cups.IPPError) as e:
             return_dict['message'] = str(e)
             logger.warning('Exception happened: %s', e)
             return return_dict
