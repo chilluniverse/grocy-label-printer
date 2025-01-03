@@ -76,9 +76,9 @@ def get_label_context(request):
 
     printGrocy =     False if str(d.get('printGrocy', 'false')).lower() == 'false' else True
     print_alias =    False if str(d.get('print_alias', CONFIG['GROCY']['PRINT_ALIAS'])).lower() == 'false'       else True
+    print_date =     False if str(d.get('print_date', CONFIG['GROCY']['PRINT_DATE'])).lower() == 'false'         else True
     print_due_date = False if str(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])).lower() == 'false' else True
     print_today =    False if str(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])).lower() == 'false'       else True
-    print_date =     False if str(d.get('print_date', CONFIG['GROCY']['PRINT_DATE'])).lower() == 'false'         else True
     
     if DEBUG: 
         for key in d: print(key+":"+d.get(key))
@@ -132,10 +132,12 @@ def change_grocy_context(context):
         context["product"] = product.name if context["product"] == None else context["product"]
         if alias_name is not None and 0 < len(alias_name) < len(context["product"]):
             context["product"] = alias_name
-        
-    if context['due_date'] is None:
-        context['due_date'] = f"({date.today()})" if context['print_date'] else ""
-    else: context['due_date'] = f"({context['due_date']})" if context['print_due_date'] else f"({date.today()})" if context['print_today'] else ""
+    
+    if context['print_date']:
+        if context['due_date'] is None:
+            context['due_date'] = f"({date.today()})"
+        else: context['due_date'] = f"({context['due_date']})" if context['print_due_date'] else f"({date.today()})" if context['print_today'] else ""
+    else: context['due_date'] = ''
     
     return context
 
