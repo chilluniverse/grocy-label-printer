@@ -317,7 +317,7 @@ def get_preview_image():
     
     if context['printGrocy']:
         context = change_grocy_context(context)
-        if context['text'] is not ' ':
+        if context['text'] != ' ':
             context['product'] = context['text']
         im = create_label_grocy(context)
         if DEBUG: 
