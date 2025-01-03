@@ -261,7 +261,8 @@ def create_label_grocy(kwargs):
     barcode_data = kwargs['grocycode']
     label_size_mm = (kwargs['width'],kwargs['height'])
     dpi = kwargs['dpi']
-    kwargs['product'] =  kwargs['text'] if kwargs['text'] != ' ' else kwargs['product']
+
+    kwargs['product'] =  kwargs['text'] if kwargs['text'] is not None and not ' ' else kwargs['product']
     
     # Berechnung der Pixel basierend auf DPI
     label_size_px = (int(label_size_mm[0] / 25.4 * dpi), int(label_size_mm[1] / 25.4 * dpi))
@@ -374,6 +375,40 @@ def image_to_png_bytes(im):
     image_buffer.seek(0)
     return image_buffer.read()
 
+def print_file(file, job_name = "Barcode Designer"):
+    cups_connection = cups.Connection()
+    job_id = cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], file, job_name, {'choice': 'auto-fit'})
+
+    # Get the job status
+    job_info = cups_connection.getJobAttributes(job_id)
+
+    if job_info:
+        logger.info(f"Monitoring Print Job ID: {job_id}")
+        while True:
+            # Fetch the updated job info
+            job_info = cups_connection.getJobAttributes(job_id)
+
+            # Check if the job is still active
+            if job_info['job-state'] in [1, 3, 4]:  # 1: pending, 3: processing, 4: stopped
+                logger.info(f"Print Job ID: {job_id}, Status: {job_info['job-state-reasons']}")
+            elif job_info['job-state'] in [5, 9]: # 5: printing, 9: print finished
+                logger.info(f"Print Job ID: {job_id}, Final Status: {job_info['job-state-reasons']}")
+                break
+            else:
+                return_message = str(job_info['job-state-reasons'])
+                logger.warning(f'Print Job ID: {job_id}, ERROR Status {job_info['job-state-reasons']}')
+                break
+            
+            # Wait for a few seconds before checking again
+            time.sleep(2)
+    else:
+        return_message = f"Print Job: no job found with ID {job_id}"
+        logger.warning(f"Print Job: no job found with ID {job_id}")
+    
+    return_message = "Job ID: " + str(job_id)
+    del cups_connection
+    return return_message
+
 @post('/api/print/grocy')
 @get('/api/print/grocy')
 def print_grocy():
@@ -404,10 +439,8 @@ def print_grocy():
 
     if not DEBUG:
         try:
-            cups_connection = cups.Connection()
-            cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], f"{context['grocycode']}.pdf", "DYMO Label", {'choice': 'auto-fit'})
+            return_dict['message'] = print_file(f"{context['grocycode']}.pdf", f"{context['grocycode']}.pdf")
             os.remove(f"{context['grocycode']}.pdf")
-            del cups_connection
         except Exception as e:
             return_dict['message'] = str(e)
             logger.warning('Exception happened: %s', e)
@@ -445,37 +478,7 @@ def print_text():
     
     if not DEBUG:
         try:
-            cups_connection = cups.Connection()
-            job_id = cups_connection.printFile(CONFIG['PRINTER']['PRINTER'], im, "DYMO Label", {'choice': 'auto-fit'})
-
-            # Get the job status
-            job_info = cups_connection.getJobAttributes(job_id)
-
-            if job_info:
-                logger.info(f"Monitoring Print Job ID: {job_id}")
-                while True:
-                    # Fetch the updated job info
-                    job_info = cups_connection.getJobAttributes(job_id)
-
-                    # Check if the job is still active
-                    if job_info['job-state'] in [1, 3, 4]:  # 1: pending, 3: processing, 4: stopped
-                        logger.info(f"Print Job ID: {job_id}, Status: {job_info['job-state-reasons']}")
-                    elif job_info['job-state'] in [5, 9]: # 5: printing, 9: print finished
-                        logger.info(f"Print Job ID: {job_id}, Final Status: {job_info['job-state-reasons']}")
-                        break
-                    else:
-                        return_dict['message'] = str(job_info['job-state-reasons'])
-                        logger.warning(f'Print Job ID: {job_id}, ERROR Status {job_info['job-state-reasons']}')
-                        return return_dict
-                    
-                    # Wait for a few seconds before checking again
-                    time.sleep(2)
-            else:
-                return_dict['message'] = f"Print Job: no job found with ID {job_id}"
-                logger.warning(f"Print Job: no job found with ID {job_id}")
-            
-            return_dict['message'] = "Job ID: " + str(job_id)
-            del cups_connection
+            return_dict['message'] = print_file(im)
             
         except (Exception, cups.IPPError) as e:
             return_dict['message'] = str(e)
