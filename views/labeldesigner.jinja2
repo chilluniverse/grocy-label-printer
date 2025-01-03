@@ -107,10 +107,10 @@
             <div id="collapse4" class="panel-collapse collapse">
               <div class="chooser panel-body">
               <label class="btn btn-default">
-                <input type="checkbox" id="printGrocy" {% if is_checked %}checked{% endif %} onChange="preview()"> <label for="printGrocy"> Print Grocy Barcode</label>
-              </label><br>
+                <input type="checkbox" id="printGrocy" {% if is_checked %}checked{% endif %} onChange="preview()"> <label class="form-check-label" for="printGrocy">Print Grocy Barcode</label>
+              </label><br><br>
 
-              <label for="searchBox">Search Item:</label>
+              
               <input id="searchBox" type="text" class="form-control" placeholder="Search Product..." onkeyup="filterList()" onclick="showProductList()">
               <select class="form-control" id="grcyProduct" onChange="preview()">
                 {% for grcy_product in grcy_products %}<option value="{{grcy_product[0]}}">{{grcy_product[1]}}</option>{% endfor %}
@@ -120,7 +120,18 @@
                 {% for grcy_product in grcy_products %}
                   <li class="list-group-item" onclick="selectProduct('{{ grcy_product[0] }}', '{{ grcy_product[1] }}')">{{ grcy_product[1] }}</li>
                 {% endfor %}
-              </ul>
+              </ul><br>
+              
+              <label for="printDate" class="control-label input-group">Print Date:</label>
+              <div class="btn-group" data-toggle="buttons">
+                  <label class="btn btn-default active">
+                      <input type="radio" name="printDate" onchange="preview()" value="true" aria-label="True" checked="">Yes
+                  </label>
+                  <label class="btn btn-default">
+                      <input type="radio" name="printDate" onchange="preview()" value="false" aria-label="False">No
+                  </label>
+              </div>
+
 
               </div> <!-- class="chooser panel-body" -->
             </div>
@@ -230,7 +241,8 @@ function formData() {
     margin_right:  $('#marginRight').val(),
     printGrocy:  $('#printGrocy').prop('checked'),
     numCopies:   $('#numBarcodeCopies').val(),
-    grocycode:    'grcy:p:' + grcyProductValue
+    grocycode:    'grcy:p:' + grcyProductValue,
+    print_date:  $('input[name=printDate]:checked').val(),
   }
 }
 
