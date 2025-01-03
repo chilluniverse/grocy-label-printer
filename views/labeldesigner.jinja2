@@ -106,19 +106,16 @@
             </div>
             <div id="collapse4" class="panel-collapse collapse">
               <div class="chooser panel-body">
-              <label for="printGrocy">Print Grocy Barcode:</label>
-              <input type="checkbox" id="printGrocy" 
-                      {% if is_checked %}checked{% endif %} 
-                      onChange="preview()"> <br>
-
-              <label for="numBarcodeCopies">Number of copies:</label>
-              <input id="numBarcodeCopies" class="form-control" type="number" min="1" value="1" onChange="preview()" required>
+              <label class="btn btn-default">
+                <input type="checkbox" id="printGrocy" {% if is_checked %}checked{% endif %} onChange="preview()"> <label for="printGrocy"> Print Grocy Barcode</label>
+              </label><br>
 
               <label for="searchBox">Search Item:</label>
               <input id="searchBox" type="text" class="form-control" placeholder="Search Product..." onkeyup="filterList()" onclick="showProductList()">
               <select class="form-control" id="grcyProduct" onChange="preview()">
                 {% for grcy_product in grcy_products %}<option value="{{grcy_product[0]}}">{{grcy_product[1]}}</option>{% endfor %}
               </select>
+              
               <ul id="grcyProduct_list" class="list-group" style="max-height: 200px; overflow-y: auto; display: none;">
                 {% for grcy_product in grcy_products %}
                   <li class="list-group-item" onclick="selectProduct('{{ grcy_product[0] }}', '{{ grcy_product[1] }}')">{{ grcy_product[1] }}</li>
@@ -142,9 +139,17 @@
         <label for="previewImg">Label Preview:</label><br />
         <img id="previewImg" style="border: 1px solid #444; max-height: 350px; width: auto; max-width: 100%; margin-bottom: 10px;"/>
         <p>Printed size w/o margins: <span id="labelWidth">?</span> cm x <span id="labelHeight">?</span> cm</p>
-        <button id="printButton" type="button" class="btn btn-primary btn-block btn-lg" onClick="print()">
-          <span class="glyphicon glyphicon-print" aria-hidden="true"></span> Print
-        </button>
+
+        <div class="row">
+          <div class="col-xs-3 col-md-3" style="padding-right: 0;"> <!-- Remove right padding -->
+            <input id="numBarcodeCopies" type="number" class="form-control form-control-lg"  min="1" value="1" onChange="preview()" required style="height: 100%; margin-bottom: 0;"> <!-- Set height to 100% and remove margin -->
+          </div>
+          <div class="col-xs-9 col-md-9" style="padding-left: 0;"> <!-- Remove left padding -->
+            <button id="printButton" type="button" class="btn btn-primary btn-block btn-lg" onClick="print()" style="height: 100%;"> <!-- Set height to 100% -->
+              <span class="glyphicon glyphicon-print" aria-hidden="true""></span> Print
+            </button>
+          </div>
+        </div>
       </fieldset>
       <div class="panel panel-default">
         <div class="panel-heading">
