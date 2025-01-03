@@ -50,6 +50,7 @@
               </select>
               <label for="fontSize" >Font Size:</label>
               <input id="fontSize" class="form-control" type="number" min="1" value="{{ label['DEFAULT_FONT_SIZE'] }}" onChange="preview()" required>
+
               <label for="fontAlign" class="control-label input-group">Font Alignment:</label>
               <div class="btn-group" data-toggle="buttons">
                   <label class="btn btn-default">
@@ -93,6 +94,38 @@
                 <input id="marginRight" class="form-control" type="number" min="0" max="200" value="0" onChange="preview()" required>  <span class="input-group-addon">%</span>
               </div>
               </div> <!-- class="chooser panel-body" -->
+            
+            </div>
+          </div>
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h4 class="panel-title">
+                <a data-toggle="collapse" data-parent="#accordion" href="#collapse4">
+                <span class="glyphicon glyphicon-tags" aria-hidden="true"></span> Grocy Product</a>
+              </h4>
+            </div>
+            <div id="collapse4" class="panel-collapse collapse">
+              <div class="chooser panel-body">
+              <label for="printGrocy">Print Grocy Barcode:</label>
+              <input type="checkbox" id="printGrocy" 
+                      {% if is_checked %}checked{% endif %} 
+                      onChange="preview()"> <br>
+
+              <label for="numBarcodeCopies">Number of copies:</label>
+              <input id="numBarcodeCopies" class="form-control" type="number" min="1" value="1" onChange="preview()" required>
+
+              <label for="searchBox">Search Item:</label>
+              <input id="searchBox" type="text" class="form-control" placeholder="Search Product..." onkeyup="filterList()" onclick="showProductList()">
+              <select class="form-control" id="grcyProduct" onChange="preview()">
+                {% for grcy_product in grcy_products %}<option value="{{grcy_product[0]}}" {% if label['DEFAULT_SIZE'] == grcy_product[0] %}selected{% endif %}>{{grcy_product[1]}}</option>{% endfor %}
+              </select>
+              <ul id="grcyProduct_list" class="list-group" style="max-height: 200px; overflow-y: auto; display: none;">
+                {% for grcy_product in grcy_products %}
+                  <li class="list-group-item" onclick="selectProduct('{{ grcy_product[0] }}', '{{ grcy_product[1] }}')">{{ grcy_product[1] }}</li>
+                {% endfor %}
+              </ul>
+
+              </div> <!-- class="chooser panel-body" -->
             </div>
           </div>
         </div>
@@ -128,10 +161,58 @@
 {% block javascript %}
 var text = $('#labelText');
 
+function filterList() {
+  const searchValue = document.getElementById('searchBox').value.toLowerCase();
+  const items = document.querySelectorAll('#grcyProduct_list li');
+
+  // Zeige die Liste, falls noch nicht sichtbar
+  $('#grcyProduct_list').show();
+
+  items.forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(searchValue) ? '' : 'none';
+  });
+}
+
+function selectProduct(grcyProductValue, grcyProductLabel) {
+  // Setze den Wert und das Label im Dropdown-Menü
+  $('#grcyProduct').val(grcyProductValue);
+  $('#grcyProduct option:selected').text(grcyProductLabel);
+
+  // Leere das Suchfeld
+  $('#searchBox').val('');
+  $('#labelText').val('');
+
+  // Verstecke die Liste nach Auswahl eines Produkts
+  $('#grcyProduct_list').hide();
+  
+  // Rufe die Vorschau erneut auf, um die Änderungen sofort zu reflektieren
+  preview();
+}
+
+// Zeige die Liste, wenn das Suchfeld angeklickt wird
+function showProductList() {
+  $('#grcyProduct_list').show();
+}
+
+// Verstecke die Liste, wenn das Suchfeld den Fokus verliert
+$('#searchBox').on('blur', function() {
+  setTimeout(function() {$('#grcyProduct_list').hide();}, 200);  // Ein kleines Timeout, damit das Klicken auf die Liste erkannt wird
+});
+
+// Wenn ein Element in der Liste ausgewählt wird, bleibt die Liste sichtbar
+$('#grcyProduct_list').on('click', 'li', function() {
+  $('#grcyProduct_list').hide();
+});
+
 function formData() {
   //var text = $('#labelText').val().replace(/\n/g, "%0A");
+
   var text = $('#labelText').val();
   if (text == '') text = ' ';
+
+  var grcyProductValue = $('#grcyProduct option:selected').val();
+
   return {
     text:        text,
     font_family: $('#fontFamily option:selected').text(),
@@ -141,7 +222,10 @@ function formData() {
     margin_top:    $('#marginTop').val(),
     margin_bottom: $('#marginBottom').val(),
     margin_left:   $('#marginLeft').val(),
-    margin_right:  $('#marginRight').val()
+    margin_right:  $('#marginRight').val(),
+    printGrocy:  $('#printGrocy').prop('checked'),
+    numCopies:   $('#numBarcodeCopies').val(),
+    grocycode:    'grcy:p:' + grcyProductValue
   }
 }
 
