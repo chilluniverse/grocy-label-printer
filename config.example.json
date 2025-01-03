@@ -29,9 +29,9 @@
     "API_KEY": "YOUR_API_KEY",
     "PORT": 9283,
     "SSL": false,
-    "PRINT_ALIAS": "1",
-    "PRINT_DUE_DATE": "1",
-    "PRINT_TODAY": "1",
-    "PRINT_DATE": "1"
+    "PRINT_ALIAS": "true",
+    "PRINT_DATE": "true",
+    "PRINT_DUE_DATE": "true",
+    "PRINT_TODAY": "true"
   }
 }

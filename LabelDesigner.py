@@ -74,11 +74,11 @@ def get_label_context(request):
     font_family = d.get('font_family').rpartition('(')[0].strip()
     font_style  = d.get('font_family').rpartition('(')[2].rstrip(')')
 
-    printGrocy = False if str(d.get('printGrocy', 'false')).lower() == 'false' else True
-    print_alias =    False if int(d.get('print_alias', CONFIG['GROCY']['PRINT_ALIAS'])) == 0       else True
-    print_due_date = False if int(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])) == 0 else True
-    print_today =    False if int(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])) == 0       else True
-    print_date =     False if int(d.get('print_date', CONFIG['GROCY']['PRINT_DATE'])) == 0         else True
+    printGrocy =     False if str(d.get('printGrocy', 'false')).lower() == 'false' else True
+    print_alias =    False if str(d.get('print_alias', CONFIG['GROCY']['PRINT_ALIAS'])).lower() == 'false'       else True
+    print_due_date = False if str(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])).lower() == 'false' else True
+    print_today =    False if str(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])).lower() == 'false'       else True
+    print_date =     False if str(d.get('print_date', CONFIG['GROCY']['PRINT_DATE'])).lower() == 'false'         else True
     
     if DEBUG: 
         for key in d: print(key+":"+d.get(key))
