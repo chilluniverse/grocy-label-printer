@@ -96,6 +96,8 @@ def get_label_context(request):
     print_due_date = False if str(d.get('print_due_date', CONFIG['GROCY']['PRINT_DUE_DATE'])).lower() == 'false' else True
     print_today =    False if str(d.get('print_today', CONFIG['GROCY']['PRINT_TODAY'])).lower() == 'false'       else True
     
+    distribute_lines = False if str(d.get('distribute_lines', 'false')).lower() == 'false' else True
+    
     if DEBUG: 
         for key in d: print(key+":"+d.get(key))
         
@@ -122,7 +124,10 @@ def get_label_context(request):
       'margin_left':    float(d.get('margin_left',   0)),
       'margin_right':   float(d.get('margin_right',  0)),
       'line_spacing':   float(d.get('line_spacing', 8)),
-      'align':          d.get('align', 'center')
+      'align':          d.get('align', 'center'),
+      'vertical_align': d.get('vertical_align', 'top'),
+      'topHalf':        d.get('topHalf', False),
+      'distribute_lines': distribute_lines
     }
     
     context['fill_color'] = (0, 0, 0)
@@ -166,13 +171,26 @@ def draw_multiline_text(img, text, font, kwargs, offset):
 
     lines = list(break_fix(text, width, font, draw))
     line_heights = [draw.textbbox((0, 0), text=line, font=font)[3] for line in lines]
-    total_height = sum(line_heights) + (len(line_heights) - 1) * kwargs.get('line_spacing', 0)
+    total_text_height = sum(line_heights)
 
-    if total_height > img.size[1]:
-        raise ValueError("Text doesn't fit within the image dimensions")
+    # Calculate the total spacing required
+    num_gaps = len(lines) + 1  # gaps between lines + gaps at top and bottom
+    available_space = (img.size[1]*1.15 // 2 if kwargs.get('topHalf', False) else img.size[1]) - total_text_height
 
-    # Start drawing from the top-left corner
-    y = kwargs.get('margin_top', 0)
+    if available_space < 0:
+        raise ValueError("Text doesn't fit within the allowed dimensions")
+
+    gap_size = available_space // num_gaps
+
+    vertical_align = kwargs.get('vertical_align', 'top')
+    if vertical_align == 'top':
+        y = kwargs.get('margin_top', 0) + gap_size
+    elif vertical_align == 'center':
+        y = gap_size
+    elif vertical_align == 'bottom':
+        y = available_space - gap_size * (len(lines) + 1) + kwargs.get('margin_bottom', 0)
+    else:
+        raise ValueError("Invalid vertical_align value. Choose from 'top', 'center', or 'bottom'.")
 
     align = kwargs.get('align', 'left')
     for i, line in enumerate(lines):
@@ -187,7 +205,7 @@ def draw_multiline_text(img, text, font, kwargs, offset):
             raise ValueError("Invalid align value. Choose from 'left', 'center', or 'right'.")
 
         draw.text((x, y), line, font=font, fill=kwargs.get('fill_color', 'black'))
-        y += line_heights[i] + kwargs.get('line_spacing', 0)
+        y += line_heights[i] + gap_size
 
     return img
 
@@ -255,6 +273,8 @@ def create_label_grocy(kwargs):
     horizontal_offset = max((width - textsize[2])//2, 0)
     horizontal_offset = kwargs['margin_left'] - kwargs['margin_right']
     offset = horizontal_offset, vertical_offset
+    
+    kwargs['topHalf'] = True
 
     draw_multiline_text(label_image, f"{kwargs['product']}\n{kwargs['due_date']}", im_font, kwargs, offset)
 
